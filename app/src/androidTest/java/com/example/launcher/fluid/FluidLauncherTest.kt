@@ -7,14 +7,19 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.launcher.MainActivity
 import org.junit.Assert.*
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class FluidLauncherTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
+    @Before fun resetWidgetLayout() {
+        compose.runOnIdle { androidx.lifecycle.ViewModelProvider(compose.activity)[FluidModel::class.java].configure { it.copy(widgets=FluidConfig().widgets,sizes=emptyMap()) } }
+    }
     @Test fun homeDrawerKeyboardOptionsAndAllNewPagesWork() {
         compose.onNodeWithTag("fluid-home").assertExists()
-        compose.onNodeWithText("All apps").performClick()
+        compose.onNodeWithContentDescription("All apps").performClick()
         compose.onNodeWithTag("fluid-app-drawer").assertExists()
         compose.onNodeWithTag("fluid-app-search").performTextInput("Settings")
         compose.onNodeWithContentDescription("Settings").performTouchInput { longClick() }
@@ -32,6 +37,7 @@ class FluidLauncherTest {
     }
     @Test fun widgetExpandsFromItsBoundsAndGalleryScrollsToLastWidget() {
         val card=compose.onNodeWithTag("fluid-widget-AGENDA")
+        card.performScrollTo()
         val source=card.fetchSemanticsNode().boundsInRoot
         compose.mainClock.autoAdvance=false
         card.performClick()
@@ -49,5 +55,35 @@ class FluidLauncherTest {
         compose.onNodeWithContentDescription("Customize home").performClick()
         compose.onNodeWithContentDescription("Widget gallery").performClick()
         compose.onNodeWithText("A moment in time").performScrollTo().assertIsDisplayed()
+    }
+    @Test fun upwardSwipeOpensDrawerAndLongPressCanResizeAndRemoveClock() {
+        val clock=compose.onNodeWithTag("fluid-widget-CLOCK",useUnmergedTree=true)
+        val original=clock.fetchSemanticsNode().boundsInRoot.height
+        clock.performTouchInput { longClick() }
+        compose.onNodeWithTag("widget-edit").assertExists()
+        compose.onNodeWithText("Large").performClick()
+        compose.onNodeWithContentDescription("Close widget options").performClick()
+        assertTrue(clock.fetchSemanticsNode().boundsInRoot.height>original)
+        clock.performTouchInput { longClick() }
+        compose.onNodeWithText("Remove widget").performClick()
+        compose.onNodeWithTag("fluid-widget-CLOCK",useUnmergedTree=true).assertDoesNotExist()
+        compose.onNodeWithTag("fluid-home").performTouchInput { swipeUp() }
+        compose.onNodeWithTag("fluid-app-drawer").assertExists()
+    }
+    @After fun clearFixtureNotifications() {
+        FluidNotifications.mutable.value=emptyList();FluidNotifications.cancel=null
+    }
+    @Test fun notificationStackSwipesBothDirectionsAndClearsRemainingCards() {
+        compose.runOnIdle {
+            FluidNotifications.mutable.value=(1..3).map{FluidNotification("test-$it","Test app","Notice $it","A real notification shape",System.currentTimeMillis(),null,null,true)}
+            FluidNotifications.cancel={key->FluidNotifications.mutable.value=FluidNotifications.mutable.value.filterNot{it.key==key}}
+        }
+        compose.onNodeWithTag("notification-card:test-1").performTouchInput{swipeLeft()}
+        compose.waitUntil(5000){FluidNotifications.items.value.size==2}
+        compose.onNodeWithTag("notification-card:test-2").performTouchInput{swipeRight()}
+        compose.waitUntil(5000){FluidNotifications.items.value.size==1}
+        compose.onNodeWithText("Clear all").performClick()
+        compose.waitUntil(5000){FluidNotifications.items.value.isEmpty()}
+        compose.onNodeWithTag("notification-card:test-3").assertDoesNotExist()
     }
 }

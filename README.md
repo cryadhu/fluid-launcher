@@ -1,18 +1,28 @@
-# cry: new glass launcher (v1.0.1)
+# cry: glass launcher (v1.1.0)
 
-The current release replaces the previous interface with an independent lavender glass design inspired by the supplied Fluid OS reference and video. MainActivity now uses FluidModel / FluidLauncher; the old For you, Today, Tools, league, news, home grid and customization screens are not part of this interface. Their stored data is left untouched. Earlier release notes below describe the retired interface.
+The current release replaces the previous interface with a warm frosted-glass Home inspired by the latest reference, with Fluid OS navigation and controls. MainActivity now uses FluidModel / FluidLauncher; the old For you, Today, Tools, league, news, home grid and customization screens are not part of this interface. Their stored data is left untouched. Earlier release notes below describe the retired interface.
 
 - New Home, Space, Notifications and Controls pages, with spring page motion, restrained parallax and a compact floating page indicator.
 - Shared glass material: a procedural lavender wallpaper, a cached three-pass blurred wallpaper sample computed off the UI thread, translucent veils, refractive offset, fine highlights and soft shadows. Overlay backgrounds also blur the underlying launcher content on supported Android versions. Foreground text is never blurred.
 - A floating searchable installed-app drawer with All / Work / Personal / Tools filters, press springs, a drag-controlled dismissal and a native-app launch bloom. Hold an app for space assignment, dock changes, app info or uninstall. Work / Personal are launcher collections, not Android managed profiles.
-- Seven built-in live widgets: agenda, music, weather, tasks, activity, storage and date. Cards expand from their actual touch bounds into an inset-aware scrollable detail surface, then return to their original bounds. Add, remove and reorder Home widgets in Customize. The music disc uses a reduced-motion-safe infinite transition.
+- Nine built-in live widgets: clock, notifications, agenda, music, weather, tasks, activity, storage and date. Cards expand from their actual touch bounds into an inset-aware scrollable detail surface, then return to their original bounds. Add, remove and reorder Home widgets in Customize. The music disc uses a reduced-motion-safe infinite transition.
 - Live calendar events require calendar permission. Notifications and media controls require notification-listener access; notification content stays in memory and is never persisted. Weather uses Open-Meteo after choosing a city. Tasks, spaces, dock and appearance persist in new fluid_launcher_v1 preferences.
 - Activity uses the phone step counter with activity permission and counts from the first active launcher session that day. No fabricated activity or weather values. The brightness slider changes this launcher's window brightness; Android owns system-wide brightness and restricted radio switches.
 - New glass settings and widget gallery with Light / Dark / Auto appearance. Android HOME registration and bootstrap-icon hiding remain functional.
 
-Validation: 56 unit tests pass, including new config round trips, corrupt-state recovery and blur-edge checks. Release lint passes. Two emulator UI tests pass, covering all four pages, drawer filtering/search, long-press menus, keyboard dismissal, widget hero expansion/return and gallery scrolling. Signature and ZIP alignment verification pass; a signed upgrade from the backed-up previous emulator installation succeeds and the new HOME activity launches without a runtime crash. The emulator data was restored before the signed upgrade. Final APK: output/cry-1.0.0-release.apk. Screenshots: output/cry-1.0.0-home.png, output/cry-1.0.0-drawer.png, output/cry-1.0.0-space.png, output/cry-1.0.0-controls.png and output/cry-1.0.0-dark-settings.png. Performance and platform-controlled app/radio animations still need testing on the OPPO Find X9 Ultra / ColorOS 16.
+Validation: 57 unit tests pass, including new config round trips, corrupt-state recovery and blur-edge checks. Release lint passes. Four emulator UI tests pass, covering all four pages, drawer filtering/search, long-press menus, keyboard dismissal, widget hero expansion/return and gallery scrolling. Signature and ZIP alignment verification pass; a signed upgrade from the backed-up previous emulator installation succeeds and the new HOME activity launches without a runtime crash. The emulator data was restored before the signed upgrade. Final APK: output/cry-1.1.0-release.apk. Screenshots: output/cry-1.1.0-home.png, output/cry-1.0.0-drawer.png, output/cry-1.0.0-space.png, output/cry-1.0.0-controls.png and output/cry-1.0.0-dark-settings.png. Performance and platform-controlled app/radio animations still need testing on the OPPO Find X9 Ultra / ColorOS 16.
 
 ---
+
+## v1.1.0 reference Home
+
+Home now uses warm ivory and gray glass, an analog clock and animated live weather, a stacked notification widget and a compact dock. Swipe up opens the drawer even when the gesture starts over a widget. Long-press a Home widget for Compact / Standard / Large sizes or Remove; sizes and removals survive restart. Older Fluid layouts migrate to the new clock, weather and notification header once, retaining other chosen widgets.
+
+Notifications come from the Android notification listener. Swipe an individual card left or right to dismiss it, use Clear all for dismissible notifications, or See all to open Today with every notification. Android ongoing notifications are retained. Failed dismissals return the card to the stack; content remains in memory only. Long-pressing removes the widget itself through its options sheet.
+
+Clock hands animate with the phone time. Weather includes drifting clouds, a sun and rain animation for actual rainy conditions, animated temperature changes and city setup through the expanded weather card. No sample temperatures, events or notifications are inserted in production.
+
+Validation: 57 unit tests and four emulator interaction tests pass. Coverage includes resize persistence/migration, Home swipe-up, resize/remove, both notification swipe directions, Clear all, widget hero transitions and gallery scrolling. Final hardware smoothness on ColorOS remains a device test.
 
 ## v1.0.1 corrections
 

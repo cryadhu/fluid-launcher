@@ -64,9 +64,9 @@ object F {
 internal fun DrawScope.wallpaper(scene: GlassScene) {
     val w = scene.size.width; val h = scene.size.height
     val dark = scene.dark
-    drawRect(Brush.linearGradient(if (dark) listOf(Color(0xFF373147),Color(0xFF231C38),Color(0xFF4B386E)) else listOf(Color(0xFFD3D4DE),Color(0xFFE4DFF1),Color(0xFFC6B7F4)), end = Offset(w,h)), size = scene.size)
+    drawRect(Brush.linearGradient(if (dark) listOf(Color(0xFF373147),Color(0xFF231C38),Color(0xFF4B386E)) else listOf(Color(0xFFD7DDDA),Color(0xFFEAECE7),Color(0xFFEED9C6)), end = Offset(w,h)), size = scene.size)
     val wave = Path().apply { moveTo(-w*.2f,h*.86f); cubicTo(w*.08f,h*.5f,w*.44f,h*.28f,w*1.2f,h*.22f); lineTo(w*1.2f,h*1.2f); lineTo(-w*.2f,h*1.2f); close() }
-    drawPath(wave, Brush.linearGradient(if (dark) listOf(Color(0xFF9B6BA9),Color(0xFF574889),Color(0xFF322844)) else listOf(Color(0xFFF4D9EC),Color(0xFFB8ABED),Color(0xFFDFE6F0)), Offset(w*.9f,h*.22f), Offset(w*.15f,h*.99f)))
+    drawPath(wave, Brush.linearGradient(if (dark) listOf(Color(0xFF9B6BA9),Color(0xFF574889),Color(0xFF322844)) else listOf(Color(0xFFF3F0E8),Color(0xFFDCE4DF),Color(0xFFF0D7BC)), Offset(w*.9f,h*.22f), Offset(w*.15f,h*.99f)))
     val edge = Path().apply { moveTo(-w*.2f,h*.86f); cubicTo(w*.08f,h*.5f,w*.44f,h*.28f,w*1.2f,h*.22f) }
     drawPath(edge, Color.White.copy(alpha = if (dark) .2f else .64f), style = Stroke(2.dp.toPx()))
     drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = if (dark) .06f else .24f), Color.Transparent), center = Offset(w*.95f,h*.86f), radius = w*.85f), w*.85f, Offset(w*.95f,h*.86f))

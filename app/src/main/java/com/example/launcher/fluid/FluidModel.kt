@@ -14,23 +14,28 @@ import org.json.JSONObject
 import java.time.LocalDate
 
 enum class FluidWidget(val title: String, val subtitle: String, val glyph: String) {
+    CLOCK("Clock", "Time in motion", "clock"), NOTIFICATIONS("Notifications", "Your day, stacked in glass", "silent"),
     AGENDA("Agenda", "Your day, at a glance", "calendar"), MUSIC("Music", "A little rhythm", "music"),
     WEATHER("Weather", "A window outside", "weather"), TASKS("Tasks", "Make room for focus", "tasks"),
     ACTIVITY("Activity", "Steps while the launcher is active", "health"), STORAGE("Storage", "Space for what matters", "files"), DATE("Date", "A moment in time", "calendar")
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
-data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.AGENDA), val mode: String = "Light", val labels: Boolean = true,
-    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"))
+data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Light", val labels: Boolean = true,
+    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap())
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
+    put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
     put("work", JSONArray(config.work.toList())); put("personal", JSONArray(config.personal.toList())); put("dock", JSONArray(config.dock))
 }.toString()
 fun decodeFluid(raw: String): FluidConfig = runCatching {
     val j = JSONObject(raw)
     fun list(key: String) = j.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
-    FluidConfig(list("widgets").mapNotNull { name -> FluidWidget.entries.find { it.name == name } }.distinct(),
+    val stored = list("widgets").mapNotNull { name -> FluidWidget.entries.find { it.name == name } }.distinct()
+    val widgets = if(j.optInt("homeVersion",1)<2) (listOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.NOTIFICATIONS)+stored).distinct() else stored
+    val sizes = FluidWidget.entries.mapNotNull { kind -> j.optJSONObject("sizes")?.optString(kind.name)?.takeIf { it in listOf("Compact","Standard","Large") }?.let { kind to it } }.toMap()
+    FluidConfig(widgets,
         j.optString("mode", "Light").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Light", j.optBoolean("labels", true),
-        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(4) else listOf("@auto"))
+        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(4) else listOf("@auto"), sizes)
 }.getOrDefault(FluidConfig())
 
 data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<InstalledApp> = emptyList(), val loading: Boolean = true,
@@ -72,6 +77,9 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         mutable.update { it.copy(config = config) }; prefs.edit().putString("config", encodeFluid(config)).apply()
     }
     fun toggleWidget(widget: FluidWidget) = configure { it.copy(widgets = if (widget in it.widgets) it.widgets - widget else it.widgets + widget) }
+    fun resizeWidget(widget: FluidWidget, size: String) {
+        if(size in listOf("Compact","Standard","Large")) configure { it.copy(sizes = it.sizes + (widget to size)) }
+    }
     fun moveWidget(widget: FluidWidget, delta: Int) = configure { c ->
         val list = c.widgets.toMutableList(); val from = list.indexOf(widget); val to = (from + delta).coerceIn(0, (list.size - 1).coerceAtLeast(0))
         if (from >= 0) { list.removeAt(from); list.add(to, widget) }; c.copy(widgets = list)

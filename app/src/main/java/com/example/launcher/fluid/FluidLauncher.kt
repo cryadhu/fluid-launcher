@@ -60,6 +60,7 @@ private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
     val badges by NotificationBadges.packages.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState(pageCount = { 4 })
+    var widgetEdit by remember { mutableStateOf<FluidWidget?>(null) }
     var drawer by remember { mutableStateOf(false) }
     var drawerGesture by remember { mutableStateOf<Float?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
@@ -98,13 +99,14 @@ private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
         focus.clearFocus(); keyboard?.hide(); launchRect=rect; launching=app
         scope.launch { delay(170); model.launch(app); delay(260); launching=null; drawer=false; search=""; pager.scrollToPage(0) }
     }
-    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0) { drawerGesture=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.scrollToPage(0) } }
+    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0) { drawerGesture=null; widgetEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.scrollToPage(0) } }
     BackHandler {
-        when { appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panel=null; drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(0,animationSpec=spring(.92f,320f)) } }
+        when { widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panel=null; drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(0,animationSpec=spring(.92f,320f)) } }
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
-    val panelBlur by animateDpAsState(if(panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
+    val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
     var swipe by remember { mutableFloatStateOf(0f) }
+    CompositionLocalProvider(LocalWidgetEdit provides { widgetEdit=it },LocalNotificationsExpand provides { panel=null;scope.launch{pager.animateScrollToPage(2,animationSpec=spring(.9f,320f))} }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
@@ -120,7 +122,7 @@ private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
                     }) {
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
                     when(index) {
-                        0 -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(1,animationSpec=spring(.9f,320f)) }},::launch)
+                        0 -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(1,animationSpec=spring(.9f,320f)) }},{openDrawer(false)},::launch)
                         1 -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
                         2 -> FluidInbox(state,model,notices,padding)
                         3 -> FluidControls(state,model,padding,torch,{showPanel("Settings")})
@@ -146,11 +148,13 @@ private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
         AnimatedVisibility(appMenu!=null,enter=fadeIn(tween(110))+scaleIn(spring(.75f,450f),initialScale=.9f),exit=fadeOut(tween(100))+scaleOut(tween(130),targetScale=.96f)) {
             appMenu?.let { app -> FluidAppOptions(app,state,model,{appMenu=null}) }
         }
+        widgetEdit?.let { WidgetEditSheet(it,state,model) { widgetEdit=null } }
         launching?.let { AppLaunchBloom(it,launchRect,sceneSize) }
         AnimatedVisibility(state.message!=null,Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal=20.dp,vertical=68.dp),enter=fadeIn()+slideInVertically{it/2},exit=fadeOut()) {
             Text(state.message.orEmpty(),style=F.text(13),modifier=Modifier.glass(24.dp,true).padding(horizontal=20.dp,vertical=14.dp))
         }
     }
+}
 }
 
 @Composable private fun BoxScope.PageNavigation(page: Int, opacity: Float, select: (Int)->Unit) {
@@ -161,42 +165,6 @@ private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
                 Box(Modifier.width(width).height(5.dp).clip(CircleShape).background(if(page==index) F.purple else F.muted.copy(alpha=.35f)))
             }
         }
-    }
-}
-
-@Composable private fun FluidHome(state: FluidState,model: FluidModel,hero: FluidHero,badges:Set<String>,modifier: Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit) {
-    Column(modifier.navigationBarsPadding().padding(bottom=32.dp).testTag("fluid-home")) {
-      Column(Modifier.weight(1f).fillMaxWidth().combinedClickable(onClick={},onLongClick=customize).verticalScroll(rememberScrollState()).padding(bottom=8.dp)) {
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                listOf("Personal","Work","All apps").forEachIndexed { i,name ->
-                    Row(Modifier.glass(22.dp,strength=if(i==0) 1.3f else .65f).clickable { when(i){0->customize();1->space();else->ask()} }.padding(horizontal=10.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
-                        Box(Modifier.size(5.dp).background(listOf(Color(0xFF53B982),Color(0xFF59BDED),F.purple)[i],CircleShape)); Text(name,style=F.text(10,i==0))
-                    }
-                }
-            }
-            GlassIcon("edit","Customize home",Modifier.size(34.dp),onClick=customize)
-        }
-        WeekStrip(state.now)
-        Row(Modifier.fillMaxWidth().padding(top=2.dp,bottom=22.dp),verticalAlignment=Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).clickable { model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)) }.semantics { contentDescription="Open clock" }) {
-                Text(fluidDate(state.now,"HH"),style=F.text(76).copy(fontWeight=androidx.compose.ui.text.font.FontWeight.ExtraLight,lineHeight=74.sp,letterSpacing=(-4).sp),color=if(LocalGlass.current.dark) Color.White else Color.White.copy(alpha=.97f))
-                Text(fluidDate(state.now,"mm"),style=F.text(76).copy(fontWeight=androidx.compose.ui.text.font.FontWeight.ExtraLight,lineHeight=74.sp,letterSpacing=(-4).sp),color=if(LocalGlass.current.dark) Color.White else Color.White.copy(alpha=.97f))
-            }
-            Box(Modifier.onGloballyPositioned { hero.bounds[FluidWidget.MUSIC]=Rect(it.positionInRoot(),it.size.toSize()) }.graphicsLayer { alpha=if(hero.kind==FluidWidget.MUSIC) 0f else 1f }) {
-                MusicOrb(state,{model.media("play")},{hero.open(FluidWidget.MUSIC)})
-            }
-        }
-        state.config.widgets.forEach { kind -> key(kind) {
-            ExpandableWidget(kind,state,model,hero,calendar,activity,Modifier.padding(bottom=14.dp))
-        } }
-      }
-        Row(Modifier.fillMaxWidth().padding(top=4.dp,bottom=8.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
-            val dock = remember(state.apps,state.config.dock) { fluidDock(state.apps,state.config.dock) }
-            dock.forEach { app -> FluidAppTile(app,badges,false,launch,{customize()},Modifier.width(64.dp)) }
-            if(dock.isEmpty()) GlassButton(if(state.loading) "Finding your apps…" else "All apps",onClick=ask)
-        }
-        GlassButton("Search apps",Modifier.align(Alignment.CenterHorizontally),glyph="search",onClick=ask)
     }
 }
 
@@ -223,12 +191,13 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     }
 }
 
-@Composable private fun ExpandableWidget(kind:FluidWidget,state:FluidState,model:FluidModel,hero:FluidHero,calendar:()->Unit,activity:()->Unit,modifier:Modifier=Modifier) {
+@Composable internal fun ExpandableWidget(kind:FluidWidget,state:FluidState,model:FluidModel,hero:FluidHero,calendar:()->Unit,activity:()->Unit,modifier:Modifier=Modifier) {
+    val edit=LocalWidgetEdit.current
     val interaction=remember { MutableInteractionSource() }
     var source by remember { mutableStateOf(Rect.Zero) }
     Column(modifier.fillMaxWidth().onGloballyPositioned { source=Rect(it.positionInRoot(),it.size.toSize());hero.bounds[kind]=source }.graphicsLayer { alpha=if(hero.kind==kind) 0f else 1f }
-        .softPress(interaction).glass(30.dp,true).combinedClickable(interactionSource=interaction,indication=null,onClick={hero.open(kind,source)},onLongClick={hero.open(kind,source)}).padding(20.dp).testTag("fluid-widget-${kind.name}")) {
-        WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity)
+        .softPress(interaction).glass(30.dp,true).combinedClickable(interactionSource=interaction,indication=null,onClick={hero.open(kind,source)},onLongClick={edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
+        WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity,compact=state.config.sizes[kind]=="Compact")
     }
 }
 
@@ -250,21 +219,8 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
 
 @Composable private fun FluidInbox(state:FluidState,model:FluidModel,notices:List<FluidNotification>,modifier:Modifier) {
     Column(modifier.verticalScroll(rememberScrollState()).padding(bottom=100.dp).testTag("fluid-notifications"),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        FluidHeading(fluidDate(state.now,"HH:mm"),fluidDate(state.now,"EEE, MMM d")) { GlassIcon("silent","Notification access",onClick=model::accessNotifications) }
-        Spacer(Modifier.height(12.dp))
-        if(!state.device.mediaAccess) Column(Modifier.glass(28.dp).padding(24.dp)) {
-            Text("Everything, in one place",style=F.text(20,true)); Text("Connect notification access to see your live notifications here. Content stays on this device.",style=F.text(13,muted=true),modifier=Modifier.padding(top=10.dp)); GlassButton("Connect notifications",Modifier.padding(top=20.dp),primary=true,onClick=model::accessNotifications)
-        } else if(notices.isEmpty()) Column(Modifier.fillMaxWidth().glass(28.dp).padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-            Glyph("check",F.purple,Modifier.size(34.dp)); Text("All caught up",style=F.text(20,true),modifier=Modifier.padding(top=14.dp)); Text("Enjoy a quieter moment.",style=F.text(13,muted=true),modifier=Modifier.padding(top=7.dp))
-        }
-        notices.forEach { notice -> key(notice.key) {
-            Row(Modifier.fillMaxWidth().animateContentSize(spring(.9f,350f)).glass(26.dp).clickable(enabled=notice.intent!=null) { model.action { notice.intent?.send() } }.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
-                if(notice.icon!=null) Image(notice.icon.asImageBitmap(),null,Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))) else Glyph("silent",F.purple,Modifier.size(34.dp))
-                Column(Modifier.weight(1f).padding(horizontal=12.dp)) { Text(notice.title,style=F.text(13,true),maxLines=2,overflow=TextOverflow.Ellipsis); if(notice.text.isNotBlank()) Text(notice.text,style=F.text(12,muted=true),maxLines=3,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=4.dp)); Text("${notice.app} · ${fluidDate(notice.time,"HH:mm")}",style=F.text(10,muted=true),modifier=Modifier.padding(top=6.dp)) }
-                if(notice.clearable) GlassIcon("close","Dismiss ${notice.app}",Modifier.size(30.dp)) { FluidNotifications.dismiss(notice.key) }
-            }
-        } }
-        if(notices.any{it.clearable}) GlassButton("Clear all",Modifier.align(Alignment.CenterHorizontally).padding(top=12.dp)) { FluidNotifications.clear() }
+        FluidHeading("Today",fluidDate(state.now,"EEE, MMM d")) { GlassIcon("silent","Notification access",onClick=model::accessNotifications) }
+        NotificationStack(state,model,detail=true)
     }
 }
 

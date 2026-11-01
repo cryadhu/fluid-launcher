@@ -6,7 +6,7 @@ import org.junit.Test
 class FluidConfigTest {
     @Test fun newDesignDefaultsAreIndependentOfLegacyPages() {
         val config = FluidConfig()
-        assertEquals(listOf(FluidWidget.AGENDA),config.widgets)
+        assertEquals(listOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.NOTIFICATIONS,FluidWidget.AGENDA),config.widgets)
         assertEquals("Light",config.mode)
         assertEquals(listOf("@auto"),config.dock)
         assertTrue(config.work.isEmpty())
@@ -17,10 +17,18 @@ class FluidConfigTest {
     }
     @Test fun corruptPreferencesRecoverAndUnknownWidgetsAreIgnored() {
         assertEquals(FluidConfig(),decodeFluid("broken json"))
-        val decoded=decodeFluid("""{"widgets":["UNKNOWN","DATE","DATE"],"mode":"invalid","dock":["a","a","b","c","d","e"]}""")
+        val decoded=decodeFluid("""{"widgets":["UNKNOWN","DATE","DATE"],"homeVersion":2,"mode":"invalid","dock":["a","a","b","c","d","e"]}""")
         assertEquals(listOf(FluidWidget.DATE),decoded.widgets)
         assertEquals("Light",decoded.mode)
         assertEquals(listOf("a","b","c","d"),decoded.dock)
+    }
+    @Test fun oldHomeGetsNewHeaderAndNotificationsWhileSizesPersist() {
+        val migrated=decodeFluid("""{"widgets":["TASKS"],"mode":"Dark"}""")
+        assertEquals(listOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.NOTIFICATIONS,FluidWidget.TASKS),migrated.widgets)
+        val edited=migrated.copy(widgets=emptyList(),sizes=mapOf(FluidWidget.CLOCK to "Large",FluidWidget.TASKS to "Compact"))
+        assertEquals(edited,decodeFluid(encodeFluid(edited)))
+        val bad=decodeFluid("""{"homeVersion":2,"widgets":[],"sizes":{"CLOCK":"HUGE","TASKS":"Compact"}}""")
+        assertEquals(mapOf(FluidWidget.TASKS to "Compact"),bad.sizes)
     }
     @Test fun frostPreservesSolidColorsAndSoftensEdges() {
         val solid=IntArray(16){0xFF8866CC.toInt()}

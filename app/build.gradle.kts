@@ -20,8 +20,8 @@ android {
         applicationId = "com.example.launcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 44
-        versionName = "1.0.1"
+        versionCode = 45
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }

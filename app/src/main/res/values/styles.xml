@@ -3,7 +3,7 @@
         <item name="android:fontFamily">@font/manrope</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#DED8EF</item>
+        <item name="android:windowBackground">#E5E8DF</item>
         <item name="android:windowAnimationStyle">@style/Animation.LauncherHome</item>
         <item name="android:colorAccent">#8051FF</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
