@@ -33,3 +33,19 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Local launcher artifacts and signing material
+**/build/
+.gradle-dist/
+gradle-*-bin.zip
+/signing/
+/tmp/
+/output/
+/cry-*.xml
+/cry-*.png
+*.p12
+*.pfx
+*.key
+.env
+.env.*
+!.env.example

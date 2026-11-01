@@ -1,0 +1,26 @@
+<resources>
+    <style name="Theme.Launcher" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">@font/manrope</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#DED8EF</item>
+        <item name="android:windowAnimationStyle">@style/Animation.LauncherHome</item>
+        <item name="android:colorAccent">#8051FF</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <style name="Animation.LauncherHome" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/home_stationary</item>
+        <item name="android:activityOpenExitAnimation">@anim/home_stationary</item>
+        <item name="android:activityCloseEnterAnimation">@anim/home_stationary</item>
+        <item name="android:activityCloseExitAnimation">@anim/home_stationary</item>
+        <item name="android:taskOpenEnterAnimation">@anim/home_stationary</item>
+        <item name="android:taskOpenExitAnimation">@anim/home_stationary</item>
+        <item name="android:taskCloseEnterAnimation">@anim/home_stationary</item>
+        <item name="android:taskCloseExitAnimation">@anim/home_stationary</item>
+        <item name="android:taskToFrontEnterAnimation">@anim/home_stationary</item>
+        <item name="android:taskToFrontExitAnimation">@anim/home_stationary</item>
+        <item name="android:taskToBackEnterAnimation">@anim/home_stationary</item>
+        <item name="android:taskToBackExitAnimation">@anim/home_stationary</item>
+    </style>
+</resources>
