@@ -30,8 +30,8 @@ class FluidLauncherTest {
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Space").performClick()
         compose.onNodeWithTag("fluid-space").assertExists()
-        compose.onNodeWithContentDescription("Notifications").performClick()
-        compose.onNodeWithTag("fluid-notifications").assertExists()
+        compose.onNodeWithContentDescription("Markets").performClick()
+        compose.onNodeWithTag("fluid-markets").assertExists()
         compose.onNodeWithContentDescription("Controls").performClick()
         compose.onNodeWithTag("fluid-controls").assertExists()
     }

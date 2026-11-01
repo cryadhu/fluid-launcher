@@ -40,7 +40,7 @@ import com.example.launcher.ui.Glyph
 import kotlinx.coroutines.*
 import kotlin.math.*
 
-private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
+private val pageNames = listOf("Home", "Space", "Markets", "Controls")
 
 @Stable class FluidHero {
     var kind by mutableStateOf<FluidWidget?>(null)
@@ -106,7 +106,7 @@ private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
     var swipe by remember { mutableFloatStateOf(0f) }
-    CompositionLocalProvider(LocalWidgetEdit provides { widgetEdit=it },LocalNotificationsExpand provides { panel=null;scope.launch{pager.animateScrollToPage(2,animationSpec=spring(.9f,320f))} }) {
+    CompositionLocalProvider(LocalWidgetEdit provides { widgetEdit=it },LocalNotificationsExpand provides { panel=null;hero.open(FluidWidget.NOTIFICATIONS) }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
@@ -124,7 +124,7 @@ private val pageNames = listOf("Home", "Space", "Notifications", "Controls")
                     when(index) {
                         0 -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(1,animationSpec=spring(.9f,320f)) }},{openDrawer(false)},::launch)
                         1 -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
-                        2 -> FluidInbox(state,model,notices,padding)
+                        2 -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
                         3 -> FluidControls(state,model,padding,torch,{showPanel("Settings")})
                     }
                 }
@@ -217,13 +217,6 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     }
 }
 
-@Composable private fun FluidInbox(state:FluidState,model:FluidModel,notices:List<FluidNotification>,modifier:Modifier) {
-    Column(modifier.verticalScroll(rememberScrollState()).padding(bottom=100.dp).testTag("fluid-notifications"),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        FluidHeading("Today",fluidDate(state.now,"EEE, MMM d")) { GlassIcon("silent","Notification access",onClick=model::accessNotifications) }
-        NotificationStack(state,model,detail=true)
-    }
-}
-
 @Composable private fun FluidControls(state:FluidState,model:FluidModel,modifier:Modifier,torch:()->Unit,settings:()->Unit) {
     val context=LocalContext.current
     var brightness by remember { mutableFloatStateOf(runCatching { Settings.System.getInt(context.contentResolver,Settings.System.SCREEN_BRIGHTNESS)/255f }.getOrDefault(.5f)) }
@@ -261,7 +254,7 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
 @Composable private fun ControlTile(title:String,subtitle:String,glyph:String,on:Boolean,modifier:Modifier,click:()->Unit) {
     val interaction=remember{MutableInteractionSource()}
     val active by animateFloatAsState(if(on)1f else 0f,spring(.85f,350f),label="Radio tile")
-    Column(modifier.softPress(interaction).glass(28.dp).background(Brush.linearGradient(listOf(F.lilac.copy(alpha=active*.88f),F.purple.copy(alpha=active*.94f))))
+    Column(modifier.softPress(interaction).glass(28.dp).background(Brush.linearGradient(listOf(F.lilac.copy(alpha=active*.22f),F.purple.copy(alpha=active*.28f))))
         .clickable(interaction,indication=null,role=Role.Button,onClick=click).padding(17.dp).heightIn(min=101.dp)) {
         Box(Modifier.size(33.dp).clip(CircleShape).background(Color.White.copy(alpha=.28f)),contentAlignment=Alignment.Center){Glyph(glyph,if(on)Color.White else F.purple,Modifier.size(19.dp))}
         Spacer(Modifier.height(14.dp));Text(title,style=F.text(12,true),color=if(on)Color.White else F.ink);Text(subtitle,style=F.text(10),color=if(on)Color.White.copy(alpha=.85f) else F.muted,maxLines=1,overflow=TextOverflow.Ellipsis)

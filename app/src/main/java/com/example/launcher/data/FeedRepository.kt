@@ -17,7 +17,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.io.File
 
-data class Story(val title: String, val url: String, val source: String, val category: String, val published: String)
+data class Story(val title: String, val url: String, val source: String, val category: String, val published: String, val imageUrl: String? = null)
 data class Rate(val pair: String, val value: Double, val date: String)
 data class FeedData(val stories: List<Story> = emptyList(), val rates: List<Rate> = emptyList(), val fetchedAt: Long = 0, val error: String? = null)
 
@@ -74,17 +74,18 @@ internal fun parseRss(raw: String, category: String = "WORLD"): List<Story> {
     parser.setInput(raw.reader())
     val stories = mutableListOf<Story>()
     var inItem = false
-    var title = ""; var link = ""; var date = ""
+    var title = ""; var link = ""; var date = ""; var image: String? = null
     while (parser.eventType != XmlPullParser.END_DOCUMENT) {
         if (parser.eventType == XmlPullParser.START_TAG) {
-            if (parser.name == "item") { inItem = true; title = ""; link = ""; date = "" }
+            if (parser.name == "item") { inItem = true; title = ""; link = ""; date = ""; image = null }
             else if (inItem) when (parser.name) {
+                "media:content", "media:thumbnail", "enclosure" -> parser.getAttributeValue(null, "url")?.takeIf { it.startsWith("https://") && (parser.name != "enclosure" || parser.getAttributeValue(null, "type").orEmpty().startsWith("image/")) }?.let { image = it }
                 "title" -> title = parser.nextText()
                 "link" -> link = parser.nextText()
                 "pubDate" -> date = parser.nextText()
             }
         } else if (parser.eventType == XmlPullParser.END_TAG && parser.name == "item") {
-            if (title.isNotBlank() && link.startsWith("https://")) stories += Story(title, link, "The Guardian", category, date.take(22))
+            if (title.isNotBlank() && link.startsWith("https://")) stories += Story(title, link, "The Guardian", category, date.take(22), image)
             inItem = false
         }
         parser.next()
@@ -107,7 +108,7 @@ class FeedRepository(context: Context) {
             val stories = json.getJSONArray("stories")
             val rates = json.getJSONArray("rates")
             FeedData(
-                (0 until stories.length()).map { stories.getJSONObject(it).let { s -> Story(s.getString("title"), s.getString("url"), s.getString("source"), s.getString("category"), s.getString("published")) } },
+                (0 until stories.length()).map { stories.getJSONObject(it).let { s -> Story(s.getString("title"), s.getString("url"), s.getString("source"), s.getString("category"), s.getString("published"), s.optString("imageUrl").takeIf { it.startsWith("https://") }) } },
                 (0 until rates.length()).map { rates.getJSONObject(it).let { r -> Rate(r.getString("pair"), r.getDouble("value"), r.getString("date")) } },
                 json.getLong("fetchedAt")
             )
@@ -122,7 +123,7 @@ class FeedRepository(context: Context) {
         val data = FeedData((n.stories + retained).distinctBy { it.url }, m.getOrDefault(old.rates), if (n.updated.isNotEmpty() || refreshRates && m.isSuccess) System.currentTimeMillis() else old.fetchedAt, errors.takeIf { it.isNotEmpty() }?.joinToString(" · "))
         withContext(Dispatchers.IO) {
             val json = JSONObject().put("fetchedAt", data.fetchedAt)
-                .put("stories", JSONArray(data.stories.map { JSONObject().put("title", it.title).put("url", it.url).put("source", it.source).put("category", it.category).put("published", it.published) }))
+                .put("stories", JSONArray(data.stories.map { JSONObject().put("title", it.title).put("url", it.url).put("source", it.source).put("category", it.category).put("published", it.published).put("imageUrl", it.imageUrl) }))
                 .put("rates", JSONArray(data.rates.map { JSONObject().put("pair", it.pair).put("value", it.value).put("date", it.date) }))
             val temp = File(cache.parentFile, "public_feed.tmp")
             temp.writeText(json.toString())

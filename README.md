@@ -338,3 +338,7 @@ Validation: 52 unit tests passed; release lint, APK signing/alignment and instru
 - Drawer long-press menu adds Add to favorite / Remove from favorites. App favorites are persisted separately from contact favorites.
 - Favorites appear below new apps in a horizontally scrollable row with launch, options, and drag-to-Home support. Empty favorites have no row or divider. Search continues to show matching apps only.
 - Updated install-window boundary tests; added favorites row instrumentation coverage (compiled only; device runtime verification pending).
+
+### Markets and news
+
+The former Today page is now Markets & news. Indian equities (Reliance, TCS and HDFC Bank on NSE) are selected by default. Tap a quote or the settings icon to select a market preset, enter up to eight Yahoo Finance symbols from any supported exchange, and choose news topics including sports, music and movies. Preferences persist across restarts. Stock charts offer 1D, 1M, 3M and 1Y ranges; quotes display their provider timestamp and may be delayed. Public Yahoo Finance data can be unavailable or rate limited; the page shows a retry message instead of sample prices. Refresh reloads quotes and news. Guardian RSS stories display publisher images when supplied, with a glass placeholder when an image is unavailable, and open the original article on tap. Notification details remain available from the home notification stack. Shared glass surfaces and translucent control tints apply throughout the active Fluid launcher.

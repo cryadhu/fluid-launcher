@@ -119,7 +119,9 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             }
                         }
                     }
+                    "Market & news settings" -> { MarketNewsSettings(state, model) }
                     "Settings" -> {
+                        GlassButton("Market & news settings", glyph="settings") { navigate("Market & news settings") }
                         PanelCard("APPEARANCE"){
                             Text("Soft light. Quiet dark.",style=F.text(18,true));Text("Every surface follows your theme.",style=F.text(12,muted=true),modifier=Modifier.padding(top=6.dp))
                             Row(Modifier.fillMaxWidth().padding(top=18.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){

@@ -21,9 +21,9 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Light", val labels: Boolean = true,
-    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap())
+    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS))
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
-    put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
+    put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
     put("work", JSONArray(config.work.toList())); put("personal", JSONArray(config.personal.toList())); put("dock", JSONArray(config.dock))
 }.toString()
@@ -35,7 +35,7 @@ fun decodeFluid(raw: String): FluidConfig = runCatching {
     val sizes = FluidWidget.entries.mapNotNull { kind -> j.optJSONObject("sizes")?.optString(kind.name)?.takeIf { it in listOf("Compact","Standard","Large") }?.let { kind to it } }.toMap()
     FluidConfig(widgets,
         j.optString("mode", "Light").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Light", j.optBoolean("labels", true),
-        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(4) else listOf("@auto"), sizes)
+        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(4) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS))
 }.getOrDefault(FluidConfig())
 
 data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<InstalledApp> = emptyList(), val loading: Boolean = true,

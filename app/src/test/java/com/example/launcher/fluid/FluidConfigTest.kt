@@ -30,6 +30,19 @@ class FluidConfigTest {
         val bad=decodeFluid("""{"homeVersion":2,"widgets":[],"sizes":{"CLOCK":"HUGE","TASKS":"Compact"}}""")
         assertEquals(mapOf(FluidWidget.TASKS to "Compact"),bad.sizes)
     }
+    @Test fun marketAndNewsPreferencesSurviveRestart() {
+        assertEquals("India", FluidConfig().market)
+        assertTrue(FluidConfig().stockSymbols.contains(".NS"))
+        val config = FluidConfig(market="Custom",stockSymbols="SAP.DE,0700.HK",newsTopics=setOf(com.example.launcher.data.NewsCategory.MUSIC,com.example.launcher.data.NewsCategory.MOVIES))
+        assertEquals(config,decodeFluid(encodeFluid(config)))
+        assertEquals(emptySet<com.example.launcher.data.NewsCategory>(),decodeFluid(encodeFluid(config.copy(newsTopics=emptySet()))).newsTopics)
+    }
+    @Test fun stockParserSkipsMissingChartPrices() {
+        val quote = parseStock("""{"chart":{"result":[{"meta":{"regularMarketPrice":110,"chartPreviousClose":100,"currency":"INR","regularMarketTime":1000},"indicators":{"quote":[{"close":[100,null,110]}]}}]}}""", "TCS.NS")
+        assertEquals(10.0,quote.change,0.001)
+        assertEquals(listOf(100f,110f),quote.points)
+        assertEquals(1000000L,quote.time)
+    }
     @Test fun frostPreservesSolidColorsAndSoftensEdges() {
         val solid=IntArray(16){0xFF8866CC.toInt()}
         blurPass(solid,4,4,2)

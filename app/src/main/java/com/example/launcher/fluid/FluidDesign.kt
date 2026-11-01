@@ -84,7 +84,7 @@ fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Floa
         .shadow(if (elevated) 18.dp else 6.dp, shape, ambientColor = Color(0xFF5D468B).copy(alpha = .12f), spotColor = Color(0xFF5D468B).copy(alpha = .12f))
         .clip(shape).drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
-            val veil = if (scene.dark) Color(0xFF211B37).copy(alpha = .58f*strength) else Color.White.copy(alpha = .42f*strength)
+            val veil = if (scene.dark) Color(0xFF211B37).copy(alpha = .40f*strength) else Color.White.copy(alpha = .26f*strength)
             val highlight = Brush.linearGradient(listOf(Color.White.copy(alpha = if (scene.dark) .24f else .85f), Color.White.copy(alpha = .08f), Color.White.copy(alpha = .42f)))
             onDrawBehind {
                 // A cached, blurred wallpaper sample refracts beneath crisp foreground content.
