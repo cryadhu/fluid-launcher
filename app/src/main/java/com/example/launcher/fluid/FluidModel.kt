@@ -17,7 +17,7 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
     BRIGHTNESS("Brightness", "Display brightness", "weather"), VOLUME("Volume", "Media volume", "music"),
     WIFI("Wi-Fi", "Internet controls", "wifi"), BLUETOOTH("Bluetooth", "Bluetooth controls", "bluetooth"), MOBILE_DATA("Mobile data", "Mobile connection", "mobile"), SOUND("Sound", "Normal, silent and vibrate", "silent"), FLASHLIGHT("Flashlight", "Quick light", "flashlight"), AIRPLANE("Airplane mode", "Flight mode controls", "airplane"),
     CLOCK("Clock", "Time in motion", "clock"), NOTIFICATIONS("Notifications", "Your day, stacked in glass", "silent"),
-    AGENDA("Agenda", "Your day, at a glance", "calendar"), MUSIC("Music", "A little rhythm", "music"),
+    AGENDA("Agenda", "Your day, at a glance", "calendar"), MUSIC("Music", "Orb with glass background", "music"), MUSIC_OPEN("Music (open)", "Orb without background", "music"),
     WEATHER("Weather", "A window outside", "weather"), TASKS("Tasks", "Make room for focus", "tasks"),
     ACTIVITY("Activity", "Steps while the launcher is active", "health"), STORAGE("Storage", "Space for what matters", "files"), DATE("Date", "A moment in time", "calendar")
 }

@@ -207,8 +207,10 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     val edit=LocalWidgetEdit.current
     val interaction=remember { MutableInteractionSource() }
     var source by remember { mutableStateOf(Rect.Zero) }
+    val opensDetail=kind!=FluidWidget.TASKS
+    val surface=if(kind==FluidWidget.MUSIC_OPEN) Modifier else Modifier.glass(30.dp,true)
     Column(modifier.fillMaxWidth().onGloballyPositioned { source=Rect(it.positionInRoot(),it.size.toSize());hero.bounds[kind]=source }.graphicsLayer { alpha=if(hero.kind==kind) 0f else 1f }
-        .softPress(interaction).glass(30.dp,true).combinedClickable(interactionSource=interaction,indication=null,onClick={hero.open(kind,source)},onLongClick={edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
+        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick={if(opensDetail)hero.open(kind,source)},onLongClick={edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
         WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity,compact=state.config.sizes[kind]=="Compact")
     }
 }

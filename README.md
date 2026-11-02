@@ -449,3 +449,9 @@ Light, Dark and Auto now only control Fluid Launcher's own appearance. They no l
 The analogue clock now initializes its seconds hand at the current time, then moves continuously through the nearest next second instead of sweeping a full dial after returning Home. The weather cloud has a shorter silhouette. Dark Dawn and Lavender wallpapers use a lighter dark veil so their artwork remains visible.
 
 Today at Work includes an inline task field and add button in the widget itself. The notifications widget also reconciles with Android's active notification list every four seconds while visible, covering devices that omit a notification-removal callback.
+
+### v1.1.15 — Music orbs and inline tasks
+
+The widget gallery now includes two music-orb choices: Music has a glass backing, while Music (open) leaves the orb unframed. Both have an animated circular album-art illustration, open progress ring, and play/pause control. The artwork rotates and makes a subtle circular orbit while music plays.
+
+Today at Work no longer opens its detail screen on a normal tap, keeping the inline task field and add button available directly in the widget.

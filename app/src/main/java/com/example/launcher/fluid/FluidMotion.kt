@@ -40,7 +40,7 @@ import kotlin.math.roundToInt
         Box(Modifier.fillMaxSize().background(Color(0xFF493475).copy(alpha=.10f*p)).pointerInput(Unit){detectTapGestures{hero.expanded=false}})
         Column(Modifier.offset{IntOffset(bounds.left.roundToInt(),bounds.top.roundToInt())}.size(with(density){bounds.width.toDp()},with(density){bounds.height.toDp()})
             .glass((30f+6*p).dp,true).testTag("fluid-expanded-widget").verticalScroll(scroll,enabled=p>.99f)
-            .padding(horizontal=if(kind==FluidWidget.MUSIC)(20*p).dp else 20.dp).padding(top=if(kind==FluidWidget.MUSIC)(20*p).dp else 20.dp,bottom=24.dp)) {
+            .padding(horizontal=if(kind==FluidWidget.MUSIC || kind==FluidWidget.MUSIC_OPEN)(20*p).dp else 20.dp).padding(top=if(kind==FluidWidget.MUSIC || kind==FluidWidget.MUSIC_OPEN)(20*p).dp else 20.dp,bottom=24.dp)) {
             Row(Modifier.fillMaxWidth().height((56*p).dp).graphicsLayer{alpha=p},verticalAlignment=Alignment.CenterVertically){
                 androidx.compose.material3.Text(kind.title,style=F.text(22,true),modifier=Modifier.weight(1f));GlassIcon("close","Close widget"){hero.expanded=false}
             }
