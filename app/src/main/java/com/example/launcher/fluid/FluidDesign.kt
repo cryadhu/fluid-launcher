@@ -90,11 +90,23 @@ fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Floa
     var origin by remember { mutableStateOf(Offset.Zero) }
     val shape = RoundedCornerShape(radius)
     this.onGloballyPositioned { val p = it.positionInWindow(); if (p != origin) origin = p }
-        .shadow(if (!shadowed) 0.dp else if (elevated) 18.dp else 6.dp, shape, ambientColor = Color(0xFF5D468B).copy(alpha = .12f), spotColor = Color(0xFF5D468B).copy(alpha = .12f))
+        .shadow(if (!shadowed) 0.dp else if (elevated) 22.dp else 12.dp, shape, ambientColor = Color(0xFF18202D).copy(alpha = .20f), spotColor = Color(0xFF18202D).copy(alpha = .30f))
         .clip(shape).drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
-            val veil = if (scene.dark) Color(0xFF211B37).copy(alpha = .40f*strength) else Color.White.copy(alpha = .26f*strength)
-            val highlight = Brush.linearGradient(listOf(Color.White.copy(alpha = if (scene.dark) .24f else .85f), Color.White.copy(alpha = .08f), Color.White.copy(alpha = .42f)))
+            val veil = if (scene.dark) Color(0xFF141C29).copy(alpha = .32f*strength) else Color(0xFF62707F).copy(alpha = .14f*strength)
+            val reflection = Brush.linearGradient(
+                0f to Color.White.copy(alpha=if(scene.dark).24f else .42f),
+                .30f to Color.White.copy(alpha=if(scene.dark).08f else .13f),
+                .52f to Color.Transparent,
+                .76f to Color(0xFF182435).copy(alpha=if(scene.dark).18f else .09f),
+                1f to Color.White.copy(alpha=if(scene.dark).09f else .20f),
+                start=Offset.Zero,end=Offset(size.width*.85f,size.height))
+            val highlight = Brush.linearGradient(
+                0f to Color.White.copy(alpha=.92f),
+                .28f to Color.White.copy(alpha=.26f),
+                .55f to Color.White.copy(alpha=.04f),
+                .82f to Color.White.copy(alpha=.20f),
+                1f to Color.White.copy(alpha=.62f),start=Offset.Zero,end=Offset(size.width,size.height))
             onDrawBehind {
                 // A cached, blurred wallpaper sample refracts beneath crisp foreground content.
                 translate(-origin.x + 1.dp.toPx(), -origin.y + 2.dp.toPx()) {
@@ -103,8 +115,13 @@ fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Floa
                     else drawImage(frost, dstSize = IntSize(scene.size.width.toInt(), scene.size.height.toInt()), filterQuality = FilterQuality.Medium)
                 }
                 drawRect(veil)
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (scene.dark) .06f else .15f), Color.Transparent)))
-                drawOutline(outline, highlight, style = Stroke(1.dp.toPx()))
+                drawRect(reflection)
+                // Broad reflected light and a shaded lower edge give the pane thickness.
+                drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha=if(scene.dark).12f else .22f),Color.Transparent),
+                    center=Offset(size.width*.12f,-size.height*.18f),radius=size.maxDimension*.85f))
+                drawRect(Brush.verticalGradient(0f to Color.Transparent,.78f to Color.Transparent,1f to Color(0xFF172333).copy(alpha=if(scene.dark).16f else .08f)))
+                drawOutline(outline,Color.White.copy(alpha=if(scene.dark).035f else .08f),style=Stroke(5.dp.toPx()))
+                drawOutline(outline, highlight, style = Stroke(1.2.dp.toPx()))
             }
         }
 }

@@ -35,7 +35,7 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
     val size=state.config.sizes[FluidWidget.NOTIFICATIONS] ?: "Standard"
     val compactHeight=when(size) { "Compact"->88.dp;"Large"->112.dp;else->96.dp }
     LaunchedEffect(notifications.isEmpty()) { if(notifications.isEmpty()) expanded=false }
-    Column(Modifier.fillMaxWidth().animateContentSize(spring(1f,350f)).testTag("fluid-widget-NOTIFICATIONS")) {
+    Column(Modifier.fillMaxWidth().testTag("fluid-widget-NOTIFICATIONS")) {
         Row(Modifier.fillMaxWidth().padding(horizontal=7.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
             Text("Notification(${notifications.size})",style=F.text(11,muted=true),modifier=Modifier.weight(1f)
                 .combinedClickable(onClick={},onLongClick={edit(FluidWidget.NOTIFICATIONS)}))
