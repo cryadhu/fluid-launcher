@@ -465,3 +465,7 @@ Home and lock-screen wallpaper sections each have their own Blur wallpaper switc
 ### v1.1.17 — Plan page
 
 Plan is a fourth page after Your Space. It brings together the day’s calendar, inline tasks, Quick Actions, and Favorites. Calendar widgets now launch the native calendar on tap rather than expanding. They load up to 30 events and show the first four by default, with See all / Collapse for longer schedules. Favorites uses the phone’s starred contacts after Contacts permission is granted.
+
+### v1.1.18 — Refined app drawer
+
+The app drawer now uses a compact search and filter header, outlined All/Work/Play/Tools tabs, a glass Suggested row of recent apps, and a clearer All apps grid. Existing Personal assignments remain available through the Play tab.

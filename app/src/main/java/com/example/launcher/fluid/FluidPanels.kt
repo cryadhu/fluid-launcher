@@ -47,21 +47,27 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     LaunchedEffect(ready,focusSearch,inputReady){if(ready && focusSearch && inputReady){requester.requestFocus();keyboard?.show()}}
     LaunchedEffect(query,tab){grid.scrollToItem(0)}
     val filtered=remember(state.apps,state.config.work,state.config.personal,state.config.tools,query,tab){fluidFilteredApps(state.apps,state.config,query,tab)}
+    val suggested=remember(state.apps){state.apps.sortedByDescending { it.firstInstalledAt }.take(4)}
     Column(Modifier.fillMaxSize().glass(36.dp,strength=1.12f).imePadding().testTag("fluid-app-drawer")) {
         Box(Modifier.fillMaxWidth().height(28.dp).clickable(onClick=close).pointerInput(Unit){detectVerticalDragGestures(onDragStart={pullDistance=0f},onVerticalDrag={change,y->change.consume();pullDistance=(pullDistance+y).coerceAtLeast(0f);pull(pullDistance)},onDragEnd={finishPull(pullDistance)},onDragCancel={finishPull(0f)})}.semantics { contentDescription="Close app drawer"; onClick {close();true} },contentAlignment=Alignment.Center){Box(Modifier.width(34.dp).height(4.dp).clip(CircleShape).background(F.muted.copy(alpha=.35f)))}
-        Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            TextField(query,search,Modifier.weight(1f).heightIn(min=54.dp).glass(28.dp).focusProperties{canFocus=inputReady}.focusRequester(requester).testTag("fluid-app-search"),enabled=inputReady,singleLine=true,
+        Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+            TextField(query,search,Modifier.weight(1f).heightIn(min=48.dp).glass(28.dp).focusProperties{canFocus=inputReady}.focusRequester(requester).testTag("fluid-app-search"),enabled=inputReady,singleLine=true,
                 placeholder={Text("Search apps",style=F.text(13,muted=true))},leadingIcon={Glyph("search",F.ink,Modifier.size(18.dp))},trailingIcon={if(query.isNotBlank())IconButton(onClick={search("")}){Glyph("close",F.muted,Modifier.size(17.dp))}},textStyle=F.text(),
                 colors=TextFieldDefaults.colors(focusedContainerColor=Color.Transparent,unfocusedContainerColor=Color.Transparent,focusedIndicatorColor=Color.Transparent,unfocusedIndicatorColor=Color.Transparent,cursorColor=F.purple,focusedTextColor=F.ink,unfocusedTextColor=F.ink))
-            GlassIcon("settings","Drawer settings",onClick=settings)
+            GlassIcon("settings","Drawer settings",Modifier.size(44.dp),onClick=settings)
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=18.dp),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
-            listOf("All","Work","Personal","Tools").forEach { name ->
+        Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
+            listOf("All" to "All","Work" to "Work","Play" to "Personal","Tools" to "Tools").forEach { (label,name) ->
                 val selected=name==tab
-                Box(Modifier.weight(1f).clip(CircleShape).then(if(selected)Modifier.background(Brush.linearGradient(listOf(F.lilac,F.purple)))else Modifier.glass(20.dp)).clickable(role=Role.Tab){selectTab(name)}.semantics{this.selected=selected}.padding(vertical=9.dp),contentAlignment=Alignment.Center){Text(name,style=F.text(11),color=if(selected)Color.White else F.ink)}
+                Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).then(if(selected)Modifier.background(Brush.linearGradient(listOf(F.lilac,F.purple)))else Modifier.border(1.dp,F.purple.copy(alpha=.55f),RoundedCornerShape(8.dp))).clickable(role=Role.Tab){selectTab(name)}.semantics{this.selected=selected}.padding(vertical=8.dp),contentAlignment=Alignment.Center){Text(label,style=F.text(10,true),color=if(selected)Color.White else F.ink)}
             }
         }
         LazyVerticalGrid(GridCells.Fixed(4),Modifier.weight(1f).fillMaxWidth().testTag("fluid-app-grid"),state=grid,contentPadding=PaddingValues(start=18.dp,end=18.dp,bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+30.dp),verticalArrangement=Arrangement.spacedBy(14.dp),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
+            if(query.isBlank() && tab=="All" && suggested.isNotEmpty()) {
+                item(span={GridItemSpan(4)}) { Text("Suggested",style=F.text(11,muted=true),modifier=Modifier.padding(top=2.dp,bottom=4.dp)) }
+                item(span={GridItemSpan(4)}) { Row(Modifier.fillMaxWidth().glass(28.dp).padding(horizontal=7.dp,vertical=5.dp)) { suggested.forEach { app -> FluidAppTile(app,badges,state.config.labels,launch,options,Modifier.weight(1f)) } } }
+                item(span={GridItemSpan(4)}) { Text("All apps",style=F.text(11,muted=true),modifier=Modifier.padding(top=10.dp,bottom=1.dp)) }
+            }
             if(filtered.isEmpty())item(span={GridItemSpan(4)}) {
                 Column(Modifier.fillMaxWidth().padding(top=48.dp),horizontalAlignment=Alignment.CenterHorizontally){Glyph("app",F.purple,Modifier.size(34.dp));Text(if(state.loading)"Finding your apps…"else if(query.isNotBlank())"No matching apps"else "Make this space yours",style=F.text(17,true),modifier=Modifier.padding(top=18.dp));Text(if(tab=="Work"||tab=="Personal")"Hold any app in All to assign a space."else "Your installed apps will appear here.",style=F.text(12,muted=true),modifier=Modifier.padding(top=8.dp))}
             }
