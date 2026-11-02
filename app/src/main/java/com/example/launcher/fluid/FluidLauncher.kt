@@ -80,6 +80,19 @@ private val pageNames = listOf("Home", "Space", "Markets", "Controls")
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if(granted) model.toggle("torch") else model.message("Allow camera access to use the flashlight") }
     val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshDevice() }
     val activityPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.startSteps() }
+    val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshWeather(true) }
+    val locateWeather:()->Unit={
+        model.markWeatherLocationAsked();model.configure{it.copy(autoWeather=true)}
+        if(ContextCompat.checkSelfPermission(view.context,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)model.refreshWeather(true)
+        else locationPermission.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
+    LaunchedEffect(state.config.autoWeather,FluidWidget.WEATHER in state.config.widgets,state.device.defaultHome) {
+        if(state.device.defaultHome && state.config.autoWeather && FluidWidget.WEATHER in state.config.widgets && !model.weatherLocationAsked){
+            model.markWeatherLocationAsked()
+            if(ContextCompat.checkSelfPermission(view.context,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)locationPermission.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            else model.refreshWeather(true)
+        }
+    }
     val calendarAccess = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) }
     val activityAccess = { if(Build.VERSION.SDK_INT >=29) activityPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION) else model.startSteps() }
     val torch = { if(ContextCompat.checkSelfPermission(view.context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED) model.toggle("torch") else cameraPermission.launch(Manifest.permission.CAMERA) }

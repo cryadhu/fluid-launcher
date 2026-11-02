@@ -21,8 +21,9 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Light", val labels: Boolean = true,
-    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 3, val dockLabels: Boolean = false, val dockIconSize: Int = 48)
+    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 3, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true)
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
+    put("autoWeather",config.autoWeather)
     put("dockCount", config.dockCount); put("dockLabels", config.dockLabels); put("dockIconSize", config.dockIconSize); put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
     put("work", JSONArray(config.work.toList())); put("personal", JSONArray(config.personal.toList())); put("dock", JSONArray(config.dock))
@@ -35,7 +36,7 @@ fun decodeFluid(raw: String): FluidConfig = runCatching {
     val sizes = FluidWidget.entries.mapNotNull { kind -> j.optJSONObject("sizes")?.optString(kind.name)?.takeIf { it in listOf("Compact","Standard","Large") }?.let { kind to it } }.toMap()
     FluidConfig(widgets,
         j.optString("mode", "Light").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Light", j.optBoolean("labels", true),
-        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",3).coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56))
+        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",3).coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true))
 }.getOrDefault(FluidConfig())
 
 data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<InstalledApp> = emptyList(), val loading: Boolean = true,
@@ -50,6 +51,9 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     val state = mutable.asStateFlow()
     val device = DeviceRepository(app)
     private val sensors = app.getSystemService(android.hardware.SensorManager::class.java)
+    private var lastWeatherAttempt=0L
+    val weatherLocationAsked get() = prefs.getBoolean("weatherLocationAsked",false)
+    fun markWeatherLocationAsked() { prefs.edit().putBoolean("weatherLocationAsked",true).apply() }
     private var weatherJob: Job? = null
     private var appsJob: Job? = null
     private var deviceJob: Job? = null
@@ -62,7 +66,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         viewModelScope.launch { while (isActive) { delay(1000); mutable.update { it.copy(now = System.currentTimeMillis()) } } }
     }
     fun returnHome() { mutable.update { it.copy(homeEpoch = it.homeEpoch + 1) } }
-    fun tick() { mutable.update { it.copy(now = System.currentTimeMillis()) }; refreshDevice(); startSteps() }
+    fun tick() { mutable.update { it.copy(now = System.currentTimeMillis()) }; refreshDevice(); startSteps(); if(System.currentTimeMillis()-lastWeatherAttempt>15*60_000L)refreshWeather() }
     fun refreshApps() { appsJob?.cancel(); appsJob = viewModelScope.launch {
         try { val apps = device.apps(nativeIcons = true); mutable.update { it.copy(apps = apps, loading = false) } }
         catch (e: Exception) { if (e is CancellationException) throw e; mutable.update { it.copy(loading = false) }; message("Couldn't load apps. Try again.") }
@@ -141,13 +145,21 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         mutable.update { it.copy(tasks = tasks) }
         prefs.edit().putString("tasks", JSONArray(tasks.map { JSONObject().put("id", it.id).put("text", it.text).put("done", it.done) }).toString()).apply()
     }
-    fun weatherCity(city: String) { if (city.isBlank()) return; configure { it.copy(city = city.trim()) }; refreshWeather() }
-    fun refreshWeather() {
-        val city = mutable.value.config.city; if (city.isBlank()) return
-        weatherJob?.cancel(); weatherJob = viewModelScope.launch {
-            mutable.update { it.copy(weatherLoading = true, weatherError = null) }
-            try { val weather = WidgetDataRepository().weather(city); mutable.update { it.copy(weather = weather, weatherLoading = false) } }
-            catch (e: Exception) { if (e is CancellationException) throw e; mutable.update { it.copy(weatherLoading = false, weatherError = "Weather unavailable. Check your city and connection.") } }
+    fun weatherCity(city: String) { if (city.isBlank()) return; configure { it.copy(city = city.trim(),autoWeather=false) }; refreshWeather(true) }
+    fun useWeatherLocation() { configure { it.copy(autoWeather=true) };refreshWeather(true) }
+    fun refreshWeather(force: Boolean=false) {
+        if(weatherJob?.isActive==true && !force)return
+        weatherJob?.cancel();lastWeatherAttempt=System.currentTimeMillis()
+        weatherJob=viewModelScope.launch {
+            mutable.update{it.copy(weatherLoading=true,weatherError=null)}
+            try {
+                val config=mutable.value.config
+                val weather=if(config.autoWeather){
+                    val point=currentWeatherLocation(getApplication())
+                    WidgetDataRepository().weather(point.latitude,point.longitude,point.name)
+                } else WidgetDataRepository().weather(config.city)
+                mutable.update{it.copy(weather=weather,weatherLoading=false)}
+            }catch(e:Exception){if(e is CancellationException)throw e;mutable.update{it.copy(weatherLoading=false,weatherError=e.message ?: "Weather unavailable. Try again.")}}
         }
     }
     fun startSteps() {

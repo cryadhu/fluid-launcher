@@ -366,3 +366,14 @@ Validation for 1.1.2: 61 unit tests and nine Fluid emulator interaction tests pa
 The collapsed notification stack has no card or icon shadows and renders at most three preview cards. See all expands every notification inline into Home’s existing scroll container; vertical gestures on the notifications scroll the entire Home content, including its header and widgets, while the dock stays fixed. Collapse restores the three-card preview. Notification app icons are now 32 dp. Both collapsed and expanded cards show local timestamps as `Jan, 03 2022 10:00AM` (English month abbreviation, two-digit day, four-digit year and 12-hour time). This replaces the four-card rotating viewport from 1.1.2.
 
 Validation for 1.1.3: 61 unit tests and nine targeted Android 16 emulator interaction tests pass. The notification test checks the three-card collapsed limit, all seven expanded fixtures, 32 dp icons, timestamp text, full Home scrolling and reaching the following widget. Collapsed, expanded and scrolled layouts were visually inspected. Release lint, APK signing and ZIP alignment pass.
+
+
+## v1.1.4 automatic weather and widget-size labels
+
+Weather defaults to automatic approximate foreground location, with a one-shot location lookup and an Open-Meteo coordinate forecast. The launcher requests location permission once after default-Home setup. The expanded weather card offers Use current location and a manual city fallback. Active-launcher refreshes are limited to fifteen-minute intervals; coordinates are not persisted or tracked in the background.
+
+Weather animations use the returned WMO code, is_day flag and wind_speed_10m in km/h. Sunny/partly cloudy, overcast, rainy, snowy, foggy, stormy, moon/stars and wind visuals follow the result; wind is shown from 20 km/h. Night is based on the forecast location, independent of the launcher theme. Source fields: https://open-meteo.com/en/docs .
+
+Widget-size options keep labels centered and on one line. Narrow layouts and larger font scales use full-width stacked choices. Validation: 63 unit tests pass, release lint/build pass, and an Android UI test verifies single-line labels at 180% font scale in a 240dp-wide panel. The debug-only Compose test host is excluded from release builds.
+
+Release signing for v1.1.4 uses the existing local key in signing/cry-release.p12, as requested. Devices with APKs signed by the previous certificate require a reinstall; subsequent builds must reuse this existing key. Signing files remain excluded from Git.

@@ -106,6 +106,9 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                 Glyph("weather",F.purple,Modifier.size(46.dp))
             }
             if(detail) {
+                val locate=LocalWeatherLocate.current
+                GlassButton("Use current location",Modifier.padding(top=16.dp),glyph="maps",onClick=locate)
+                Text(if(state.config.autoWeather) "Automatic location" else "Manual city",style=F.text(11,muted=true),modifier=Modifier.padding(top=8.dp))
                 var city by remember(state.config.city) { mutableStateOf(state.config.city) }
                 Spacer(Modifier.height(18.dp)); FluidField(city,"City",{city=it})
                 GlassButton(if(state.weatherLoading) "Refreshing…" else "Update weather",Modifier.padding(top=12.dp),primary=true) { model.weatherCity(city) }
