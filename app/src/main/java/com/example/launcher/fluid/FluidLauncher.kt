@@ -42,7 +42,7 @@ import kotlin.math.*
 
 internal const val HOME_PAGE=1
 internal const val SPACE_PAGE=2
-internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
+internal val pageNames = listOf("Markets", "Home", "Space")
 
 @Stable class FluidHero {
     var kind by mutableStateOf<FluidWidget?>(null)
@@ -81,7 +81,6 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val view = LocalView.current
-    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if(granted) model.toggle("torch") else model.message("Allow camera access to use the flashlight") }
     val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshDevice() }
     val activityPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.startSteps() }
     val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshWeather(true) }
@@ -99,7 +98,6 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
     }
     val calendarAccess = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) }
     val activityAccess = { if(Build.VERSION.SDK_INT >=29) activityPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION) else model.startSteps() }
-    val torch = { if(ContextCompat.checkSelfPermission(view.context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED) model.toggle("torch") else cameraPermission.launch(Manifest.permission.CAMERA) }
     LaunchedEffect(appMenu, panel) {
         if(appMenu!=null || panel!=null) {
             focus.clearFocus(force=true); keyboard?.hide()
@@ -139,7 +137,6 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
                         HOME_PAGE -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(SPACE_PAGE,animationSpec=spring(.9f,320f)) }},::launch)
                         SPACE_PAGE -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
                         0 -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
-                        3 -> FluidControls(state,model,padding,torch,{showPanel("Settings")})
                     }
                 }
             }
@@ -233,52 +230,9 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
         } else Column(Modifier.fillMaxWidth().glass(28.dp).padding(10.dp).testTag("space-apps-$selected")) {
             apps.chunked(4).forEach { group -> Row(Modifier.fillMaxWidth()) { group.forEach { app -> FluidAppTile(app,badges,state.config.labels,launch,{manage()},Modifier.weight(1f)) };repeat(4-group.size){Spacer(Modifier.weight(1f))} } }
         }
-        state.config.spaceWidgets.forEach { kind -> key(kind) { ExpandableWidget(kind,state,model,hero,calendar,activity) } }
+        state.config.spaceWidgets.filterNot{it in tinyControls}.forEach { kind -> key(kind) { ExpandableWidget(kind,state,model,hero,calendar,activity) } }
+        ControlWidgetRows(state.config.spaceWidgets.filter{it in tinyControls},state,model)
         val openGallery=LocalSpaceWidgetGallery.current
         GlassButton("Add widgets",Modifier.fillMaxWidth(),glyph="plus",onClick=openGallery)
-    }
-}
-
-@Composable private fun FluidControls(state:FluidState,model:FluidModel,modifier:Modifier,torch:()->Unit,settings:()->Unit) {
-    val context=LocalContext.current
-    var brightness by remember { mutableFloatStateOf(runCatching { Settings.System.getInt(context.contentResolver,Settings.System.SCREEN_BRIGHTNESS)/255f }.getOrDefault(.5f)) }
-    val activity=context as? android.app.Activity
-    fun applyBrightness(value:Float) { brightness=value; activity?.window?.let { w -> w.attributes=w.attributes.apply { screenBrightness=value.coerceIn(.02f,1f) } } }
-    Column(modifier.verticalScroll(rememberScrollState()).padding(bottom=100.dp).testTag("fluid-controls"),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        FluidHeading(fluidDate(state.now,"HH:mm"),fluidDate(state.now,"EEE, MMM d")) { GlassIcon("settings","Launcher settings",onClick=settings) }
-        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            ControlTile("Wi-Fi",state.device.wifiName ?: if(state.device.wifi) "On" else "Off","wifi",state.device.wifi,Modifier.weight(1f)) { model.toggle("wifi") }
-            ControlTile("Bluetooth",when(state.device.bluetooth){true->"On";false->"Off";null->"Manage"},"bluetooth",state.device.bluetooth==true,Modifier.weight(1f)) { model.toggle("bluetooth") }
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            ControlTile("Mobile data",when(state.device.mobileData){true->"On";false->"Off";null->"Manage"},"mobile",state.device.mobileData==true,Modifier.weight(1f)) { model.toggle("mobile") }
-            ControlTile("Sound",state.device.soundMode.label,if(state.device.soundMode==SoundMode.VIBRATE) "vibrate" else "silent",state.device.soundMode!=SoundMode.NORMAL,Modifier.weight(1f)) { model.toggle("silent") }
-        }
-        Row(Modifier.fillMaxWidth().glass(25.dp).padding(horizontal=18.dp,vertical=6.dp),verticalAlignment=Alignment.CenterVertically) {
-            Glyph("weather",F.ink,Modifier.size(23.dp)); Slider(brightness,::applyBrightness,Modifier.weight(1f).padding(start=12.dp).semantics { contentDescription="Launcher brightness" },colors=SliderDefaults.colors(thumbColor=F.purple,activeTrackColor=F.purple,inactiveTrackColor=F.lilac.copy(alpha=.25f)))
-        }
-        Text("Brightness while using this launcher",style=F.text(10,muted=true),modifier=Modifier.padding(horizontal=10.dp))
-        Row(Modifier.fillMaxWidth().glass(28.dp).padding(18.dp),verticalAlignment=Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).glass(15.dp),contentAlignment=Alignment.Center){Glyph("music",F.purple)}
-            Column(Modifier.weight(1f).padding(horizontal=12.dp)){Text(state.device.mediaTitle ?: "A little rhythm",style=F.text(13,true),maxLines=2,overflow=TextOverflow.Ellipsis);Text(if(state.device.playing)"Now playing" else "Music controls",style=F.text(11,muted=true))}
-            GlassIcon(if(state.device.playing)"pause" else "play","Play or pause",Modifier.size(36.dp)){model.media("play")};GlassIcon("next","Next track",Modifier.size(36.dp)){model.media("next")}
-        }
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-            GlassIcon("flashlight","Flashlight",primary=state.device.torch,onClick=torch)
-            GlassIcon("airplane","Airplane mode",primary=state.device.airplaneMode){model.toggle("airplane")}
-            GlassIcon("clock","Alarms"){model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))}
-            GlassIcon("video","Cast screen"){model.toggle("cast")}
-        }
-        GlassButton("Phone settings",Modifier.align(Alignment.CenterHorizontally).padding(top=10.dp),glyph="settings"){model.open(Intent(Settings.ACTION_SETTINGS))}
-    }
-}
-
-@Composable private fun ControlTile(title:String,subtitle:String,glyph:String,on:Boolean,modifier:Modifier,click:()->Unit) {
-    val interaction=remember{MutableInteractionSource()}
-    val active by animateFloatAsState(if(on)1f else 0f,spring(.85f,350f),label="Radio tile")
-    Column(modifier.softPress(interaction).glass(28.dp).background(Brush.linearGradient(listOf(F.lilac.copy(alpha=active*.22f),F.purple.copy(alpha=active*.28f))))
-        .clickable(interaction,indication=null,role=Role.Button,onClick=click).padding(17.dp).heightIn(min=101.dp)) {
-        Box(Modifier.size(33.dp).clip(CircleShape).background(Color.White.copy(alpha=.28f)),contentAlignment=Alignment.Center){Glyph(glyph,if(on)Color.White else F.purple,Modifier.size(19.dp))}
-        Spacer(Modifier.height(14.dp));Text(title,style=F.text(12,true),color=if(on)Color.White else F.ink);Text(subtitle,style=F.text(10),color=if(on)Color.White.copy(alpha=.85f) else F.muted,maxLines=1,overflow=TextOverflow.Ellipsis)
     }
 }

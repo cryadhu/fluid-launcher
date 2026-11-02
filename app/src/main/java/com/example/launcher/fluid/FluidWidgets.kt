@@ -71,6 +71,9 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
 @Composable fun WidgetBody(kind: FluidWidget, state: FluidState, model: FluidModel, detail: Boolean = false,
     calendarAccess: () -> Unit = {}, activityAccess: () -> Unit = {}, compact: Boolean = false) {
     when(kind) {
+        FluidWidget.BRIGHTNESS -> BrightnessWidget(model)
+        FluidWidget.VOLUME -> VolumeWidget()
+        FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidget.MOBILE_DATA,FluidWidget.SOUND,FluidWidget.FLASHLIGHT,FluidWidget.AIRPLANE -> TinyControl(kind,state,model)
         FluidWidget.CLOCK -> AnalogClock(state.now, Modifier.fillMaxWidth().height(if(detail) 270.dp else if(compact) 110.dp else 160.dp)) { model.open(android.content.Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)) }
         FluidWidget.NOTIFICATIONS -> NotificationStack(state,model,detail=detail)
 

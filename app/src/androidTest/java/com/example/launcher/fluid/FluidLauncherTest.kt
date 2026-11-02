@@ -42,8 +42,7 @@ class FluidLauncherTest {
         compose.onNodeWithTag("fluid-space").assertExists()
         compose.onNodeWithContentDescription("Markets").performClick()
         compose.onNodeWithTag("fluid-markets").assertExists()
-        compose.onNodeWithContentDescription("Controls").performClick()
-        compose.onNodeWithTag("fluid-controls").assertExists()
+        compose.onNodeWithContentDescription("Controls").assertDoesNotExist()
     }
     @Test fun widgetExpandsFromItsBoundsAndGalleryScrollsToLastWidget() {
         val card=compose.onNodeWithTag("fluid-widget-AGENDA")

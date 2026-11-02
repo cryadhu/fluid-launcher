@@ -403,3 +403,11 @@ Customize now includes Wallpaper. Home screen and lock screen have separate sele
 Wallpaper application uses Android's [WallpaperManager](https://developer.android.com/reference/android/app/WallpaperManager) system and lock flags. Each image is rendered at device dimensions from the same artwork used in the launcher previews.
 
 Validation: 68 unit tests, two Android UI tests (including real system/lock wallpaper application and panel Back navigation), release lint, and signed release build passed. The local JBR 17 G1 runtime crashed during optimization; the successful build used Serial GC without changing app release settings.
+
+### v1.1.8 — Control widgets and animated notification stacks
+
+Removed the Controls page; the page order is Markets, Home, Your Space. Add Brightness, Media volume, Wi-Fi, Bluetooth, Mobile data, Sound, Flashlight and Airplane mode from either widget gallery. Radio widgets form compact three-column rows on Home and Your Space and support long-press resizing/removal. Brightness can change Android's system level after allowing Modify system settings; volume controls the music stream. Sound cycles normal/silent/vibrate with Android's required access; Wi-Fi, Bluetooth, mobile data and airplane mode open their supported Android control panels.
+
+The refresh glyph now uses a clean pair of circular arrows. Stock range changes keep the existing chart and card layout, with a small loader in each quote header rather than an extra loading text row. Notification expansion and collapse keep the same cards mounted while animating their position, width, height and stack spacing.
+
+Validation: 69 unit tests, release lint, signed release build and two Android UI tests passed, including control widget removal and intermediate card positions during notification expansion/collapse.

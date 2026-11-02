@@ -50,22 +50,25 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
                 Text(if(state.device.mediaAccess) "New notifications will stack here." else "Connect notifications to show your live updates.",style=F.text(11,muted=true),modifier=Modifier.padding(top=7.dp))
                 if(!state.device.mediaAccess) GlassButton("Connect notifications",Modifier.padding(top=12.dp),onClick=model::accessNotifications)
             }
-        } else if(expanded) {
-            Column(Modifier.fillMaxWidth().testTag("notification-inline-expanded"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                notifications.forEach { notice -> key(notice.key) {
-                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},true,true,
-                        Modifier.heightIn(min=108.dp))
-                } }
-            }
         } else {
+            val progress by animateFloatAsState(if(expanded)1f else 0f,spring(.9f,320f),label="Notification unstack")
+            val cardHeight=132.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
             val previews=notifications.take(3)
-            Box(Modifier.fillMaxWidth().height(compactHeight+(previews.size-1)*7.dp).clipToBounds().testTag("notification-compact-stack")) {
-                previews.withIndex().toList().asReversed().forEach { (index,notice) -> key(notice.key) {
-                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},false,index==0,
-                        Modifier.padding(horizontal=index*12.dp).offset(y=index*7.dp).height(compactHeight))
+            val closedHeight=compactHeight+(previews.size-1)*7.dp
+            val openHeight=cardHeight*notifications.size+8.dp*(notifications.size-1)
+            val totalHeight=closedHeight+(openHeight-closedHeight)*progress
+            Box(Modifier.fillMaxWidth().height(totalHeight).clipToBounds().testTag(if(expanded)"notification-inline-expanded"else"notification-compact-stack")) {
+                val visible=if(expanded || progress>.001f)notifications else previews
+                visible.withIndex().toList().asReversed().forEach { (index,notice) -> key(notice.key) {
+                    val closedY=index.coerceAtMost(2)*7.dp
+                    val openY=(cardHeight+8.dp)*index
+                    val inset=index.coerceAtMost(2)*12.dp*(1f-progress)
+                    val height=compactHeight+(cardHeight-compactHeight)*progress
+                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},progress>.5f,expanded || index==0,
+                        Modifier.offset(y=closedY+(openY-closedY)*progress).padding(horizontal=inset).height(height)
+                            .graphicsLayer { alpha=if(index<3)1f else progress; scaleX=1f-(1f-progress)*index.coerceAtMost(2)*.012f })
                 } }
             }
-
         }
     }
 }

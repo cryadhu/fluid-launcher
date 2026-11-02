@@ -74,12 +74,11 @@ private suspend fun quote(symbol: String, range: String, cache: MarketNewsCache,
             GlassIcon("refresh","Refresh stocks and headlines") { manualRefresh++ }
         }
         Text("STOCK WATCH", style=F.text(11,true,muted=true))
-        if(loading) Text("Updating quotes…", style=F.text(13,muted=true))
         stockError?.let { Text(it,style=F.text(12,muted=true)) }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
             stocks.forEach { stock ->
                 Column(Modifier.width(220.dp).glass(28.dp).clickable(onClick=settings).padding(20.dp), verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text(stock.symbol,style=F.text(17,true)); Text(stock.name,style=F.text(12,muted=true),maxLines=1)
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Text(stock.symbol,style=F.text(17,true)); if(loading) CircularProgressIndicator(Modifier.size(12.dp),strokeWidth=1.5.dp,color=F.purple) }; Text(stock.name,style=F.text(12,muted=true),maxLines=1)
                     Text("${stock.currency} ${"%,.2f".format(stock.price)}",style=F.text(22,true))
                     Text("%+.2f%%".format(stock.change),style=F.text(13,true),color=if(stock.change >= 0) Color(0xFF198874) else Color(0xFFB64076))
                     StockChart(stock.points)
@@ -87,6 +86,7 @@ private suspend fun quote(symbol: String, range: String, cache: MarketNewsCache,
                 }
             }
         }
+        if(loading && stocks.isEmpty()) Box(Modifier.width(220.dp).height(240.dp).glass(28.dp),contentAlignment=androidx.compose.ui.Alignment.Center) { CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp,color=F.purple) }
         if(!loading && stocks.isEmpty()) GlassButton("Choose stocks",onClick=settings)
         Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween) {
             listOf("1D" to "1d","1M" to "1mo","3M" to "3mo","1Y" to "1y").forEach { (label,value) -> TextButton(onClick={range=value}) { Text(label,style=F.text(12,true),color=if(range==value) F.purple else F.muted) } }

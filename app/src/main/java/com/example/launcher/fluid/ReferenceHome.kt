@@ -32,7 +32,7 @@ import kotlin.math.*
 val LocalWeatherLocate = staticCompositionLocalOf<()->Unit> { {} }
 val LocalSpaceWidgetGallery = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
-internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
+internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==FluidWidget.BRIGHTNESS || kind==FluidWidget.VOLUME) when(config.sizes[kind]) { "Compact"->64.dp;"Large"->112.dp;else->80.dp } else when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
 
 @Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit) {
     val edit=LocalWidgetEdit.current
@@ -54,13 +54,14 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config
                     }
                 }
             }
-            state.config.widgets.filterNot{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER}.forEach{kind -> key(kind){
+            state.config.widgets.filterNot{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER || it in tinyControls}.forEach{kind -> key(kind){
                 if(kind==FluidWidget.NOTIFICATIONS) Box(Modifier.onGloballyPositioned { hero.bounds[kind]=it.boundsInRoot() }) { NotificationStack(state,model) }
                 else {
                     Text(if(kind==FluidWidget.AGENDA)"Today" else kind.title,style=F.text(11,muted=true),modifier=Modifier.padding(start=8.dp,top=2.dp))
                     ExpandableWidget(kind,state,model,hero,calendar,activity)
                 }
             } }
+            ControlWidgetRows(state.config.widgets.filter{it in tinyControls},state,model)
         }
         FluidDock(state, model, badges, ask, launch)
 
