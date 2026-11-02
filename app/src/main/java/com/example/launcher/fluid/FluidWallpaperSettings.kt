@@ -14,6 +14,11 @@ import androidx.compose.ui.unit.*
 import androidx.compose.material3.Text
 import kotlinx.coroutines.*
 
+internal val wallpaperStyles=listOf("Dawn","Original","Lavender")
+
+private var dawnWallpaper:ImageBitmap?=null
+@Synchronized internal fun loadDawnWallpaper(context:android.content.Context):ImageBitmap = dawnWallpaper ?: android.graphics.BitmapFactory.decodeResource(context.resources,com.example.launcher.R.drawable.wallpaper_dawn).asImageBitmap().also { dawnWallpaper=it }
+
 @Composable internal fun WallpaperSettings(state:FluidState,model:FluidModel) {
     val scene=LocalGlass.current
     val applying=state.wallpaperApplying
@@ -21,13 +26,13 @@ import kotlinx.coroutines.*
         Text(if(lock) "Lock screen wallpaper" else "Home screen wallpaper",style=F.text(20,true))
         val selected=if(lock)state.config.lockWallpaper else state.config.homeWallpaper
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-            listOf("Original","Lavender").forEach { style ->
+            wallpaperStyles.forEach { style ->
                 Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally) {
-                    Canvas(Modifier.fillMaxWidth().height(200.dp).glass(24.dp)
+                    Canvas(Modifier.fillMaxWidth().height(164.dp).glass(24.dp)
                         .clickable(enabled=!applying,role=Role.RadioButton) {
                             model.applyWallpaper(style,lock,scene.dark)
                         }.semantics { contentDescription="${if(lock)"Lock"else"Home"} wallpaper: $style";this.selected=style==selected }) {
-                        wallpaper(GlassScene(size,scene.dark,wallpaper=style))
+                        wallpaper(scene.copy(size=size,frost=null,wallpaper=style))
                     }
                     Text(if(selected==style)"✓ $style"else style,style=F.text(12,true),modifier=Modifier.padding(top=10.dp))
                 }
@@ -47,7 +52,7 @@ internal suspend fun applySystemWallpaper(context:android.content.Context,style:
     try {
         val size=Size(width.toFloat(),height.toFloat())
         CanvasDrawScope().draw(Density(1f),LayoutDirection.Ltr,Canvas(bitmap.asImageBitmap()),size) {
-            wallpaper(GlassScene(size,dark,wallpaper=style))
+            wallpaper(GlassScene(size,dark,wallpaper=style,wallpaperImage=loadDawnWallpaper(context)))
         }
         manager.setBitmap(bitmap,null,true,if(lock)WallpaperManager.FLAG_LOCK else WallpaperManager.FLAG_SYSTEM)
     } finally { bitmap.recycle() }

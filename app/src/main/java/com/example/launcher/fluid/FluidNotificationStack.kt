@@ -35,7 +35,7 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
     val size=state.config.sizes[FluidWidget.NOTIFICATIONS] ?: "Standard"
     val compactHeight=when(size) { "Compact"->88.dp;"Large"->112.dp;else->96.dp }
     LaunchedEffect(notifications.isEmpty()) { if(notifications.isEmpty()) expanded=false }
-    Column(Modifier.fillMaxWidth().animateContentSize(spring(1f,350f)).testTag("fluid-widget-NOTIFICATIONS")) {
+    Column(Modifier.fillMaxWidth().padding(bottom=20.dp).testTag("fluid-widget-NOTIFICATIONS")) {
         Row(Modifier.fillMaxWidth().padding(horizontal=7.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
             Text("Notification(${notifications.size})",style=F.text(11,muted=true),modifier=Modifier.weight(1f)
                 .combinedClickable(onClick={},onLongClick={edit(FluidWidget.NOTIFICATIONS)}))
@@ -45,7 +45,7 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
             if(notifications.any { it.clearable }) TextButton(onClick={FluidNotifications.clear()}) { Text("Clear all",style=F.text(11,true),color=F.purple) }
         }
         if(notifications.isEmpty()) {
-            Column(Modifier.fillMaxWidth().glass(28.dp).combinedClickable(onClick={if(!state.device.mediaAccess) model.accessNotifications()},onLongClick={edit(FluidWidget.NOTIFICATIONS)}).padding(20.dp)) {
+            Column(Modifier.fillMaxWidth().glass(28.dp,elevated=true).combinedClickable(onClick={if(!state.device.mediaAccess) model.accessNotifications()},onLongClick={edit(FluidWidget.NOTIFICATIONS)}).padding(20.dp)) {
                 Text(if(state.device.mediaAccess) "All caught up" else "A clearer view of your day",style=F.text(15,true))
                 Text(if(state.device.mediaAccess) "New notifications will stack here." else "Connect notifications to show your live updates.",style=F.text(11,muted=true),modifier=Modifier.padding(top=7.dp))
                 if(!state.device.mediaAccess) GlassButton("Connect notifications",Modifier.padding(top=12.dp),onClick=model::accessNotifications)
@@ -57,7 +57,7 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
             val closedHeight=compactHeight+(previews.size-1)*7.dp
             val openHeight=cardHeight*notifications.size+8.dp*(notifications.size-1)
             val totalHeight=closedHeight+(openHeight-closedHeight)*progress
-            Box(Modifier.fillMaxWidth().height(totalHeight).clipToBounds().testTag(if(expanded)"notification-inline-expanded"else"notification-compact-stack")) {
+            Box(Modifier.fillMaxWidth().height(totalHeight).testTag(if(expanded)"notification-inline-expanded"else"notification-compact-stack")) {
                 val visible=if(expanded || progress>.001f)notifications else previews
                 visible.withIndex().toList().asReversed().forEach { (index,notice) -> key(notice.key) {
                     val closedY=index.coerceAtMost(2)*7.dp
@@ -93,7 +93,7 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
     } else Modifier
     Row(modifier.fillMaxWidth().onSizeChanged { width=it.width.toFloat() }
         .graphicsLayer { translationX=offset.value;rotationZ=offset.value/width*3f;alpha=1f-(abs(offset.value)/width).coerceIn(0f,.8f) }
-        .then(drag).glass(28.dp,elevated=expanded,shadowed=expanded)
+        .then(drag).glass(28.dp,elevated=true,shadowed=interactive)
         .combinedClickable(enabled=interactive,onClick={model.openNotification(notice)},onLongClick={latestHold()})
         .then(if(interactive) Modifier.testTag("notification-card:${notice.key}").semantics { stateDescription="Visible notification" }
             else Modifier.clearAndSetSemantics { testTag="notification-card:${notice.key}";stateDescription="Behind stack";invisibleToUser() })

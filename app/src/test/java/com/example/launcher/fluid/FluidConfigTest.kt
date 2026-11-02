@@ -4,6 +4,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FluidConfigTest {
+    @Test fun dawnAndFourDockAppsAreDefaultsAndExplicitSelectionsPersist() {
+        assertEquals(listOf("Dawn","Original","Lavender"),wallpaperStyles)
+        assertEquals("Dawn",FluidConfig().homeWallpaper)
+        assertEquals(4,FluidConfig().dockCount)
+        val migrated=decodeFluid("""{"homeWallpaper":"Original","dock":["@auto"],"dockCount":3}""")
+        assertEquals("Dawn",migrated.homeWallpaper)
+        assertEquals(4,migrated.dockCount)
+        val chosen=FluidConfig(homeWallpaper="Original",dockCount=3)
+        assertEquals(chosen,decodeFluid(encodeFluid(chosen)))
+    }
     @Test fun controlWidgetSelectionsPersistAndControlsPageIsGone() {
         val controls=listOf(FluidWidget.BRIGHTNESS,FluidWidget.VOLUME)+tinyControls
         val config=FluidConfig(widgets=controls,spaceWidgets=controls.reversed())
@@ -13,8 +23,8 @@ class FluidConfigTest {
     @Test fun homeAndLockWallpapersPersistIndependently() {
         val config=FluidConfig(homeWallpaper="Lavender",lockWallpaper="Original")
         assertEquals(config,decodeFluid(encodeFluid(config)))
-        assertEquals("Original",decodeFluid("{}").homeWallpaper)
-        assertEquals("Original",decodeFluid("""{"homeWallpaper":"unknown","lockWallpaper":"bad"}""").lockWallpaper)
+        assertEquals("Dawn",decodeFluid("{}").homeWallpaper)
+        assertEquals("Dawn",decodeFluid("""{"homeWallpaper":"unknown","lockWallpaper":"bad"}""").lockWallpaper)
     }
     @Test fun newDesignDefaultsAreIndependentOfLegacyPages() {
         val config = FluidConfig()
@@ -72,7 +82,7 @@ class FluidConfigTest {
         val bad=decodeFluid("""{"dockCount":100,"dockIconSize":-10}""")
         assertEquals(6,bad.dockCount)
         assertEquals(36,bad.dockIconSize)
-        assertEquals(3,decodeFluid("{}").dockCount)
+        assertEquals(4,decodeFluid("{}").dockCount)
         assertEquals(emptyList<String>(),decodeFluid(encodeFluid(custom.copy(dock=emptyList()))).dock)
     }
     @Test fun notificationTimestampUsesRequestedDateAndTwelveHourTime() {

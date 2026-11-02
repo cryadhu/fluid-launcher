@@ -123,8 +123,20 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                 repeat(4){i->drawCircle(Color.White.copy(alpha=.6f),1.3.dp.toPx(),Offset(x+unit*(i*.12f-.2f),y-unit*(.25f+i%2*.08f)))}
             }
             if(cloudy || weather==null){
-                val color=if(wet)Color(0xFF8E9CA6)else Color(0xFFE7ECEC)
-                listOf(Triple(-.15f,.04f,.18f),Triple(.02f,-.04f,.23f),Triple(.22f,.06f,.17f)).forEach{(dx,dy,r)->drawCircle(Brush.radialGradient(listOf(Color.White,color),Offset(x+dx*unit,y+dy*unit),r*unit),r*unit,Offset(x+dx*unit,y+dy*unit))}
+                val cloud=Path().apply {
+                    moveTo(x-unit*.28f,y+unit*.16f)
+                    cubicTo(x-unit*.43f,y+unit*.15f,x-unit*.43f,y-unit*.07f,x-unit*.27f,y-unit*.09f)
+                    cubicTo(x-unit*.24f,y-unit*.28f,x+unit*.02f,y-unit*.31f,x+unit*.10f,y-unit*.12f)
+                    cubicTo(x+unit*.25f,y-unit*.18f,x+unit*.35f,y-unit*.06f,x+unit*.32f,y+unit*.03f)
+                    cubicTo(x+unit*.47f,y+unit*.05f,x+unit*.43f,y+unit*.17f,x+unit*.30f,y+unit*.17f)
+                    lineTo(x-unit*.28f,y+unit*.16f);close()
+                }
+                val top=if(wet)Color(0xFFC1CCD7)else if(night)Color(0xFFD3DFE9)else Color(0xFFFAFCFF)
+                val bottom=if(wet)Color(0xFF7C8F9F)else Color(0xFFC4D2DE)
+                scale(.76f,1f,pivot=Offset(x,y)) {
+                    drawPath(cloud,Brush.verticalGradient(listOf(top,bottom),y-unit*.27f,y+unit*.18f))
+                    drawPath(cloud,Color.White.copy(alpha=.30f),style=Stroke(.6.dp.toPx()))
+                }
             }
             if(wet)repeat(7){i->val px=x-unit*.2f+i*unit*.065f;val py=y+unit*.18f+((rain+i*.17f)%1f)*unit*.29f;drawLine(Color(0xFF84BACC).copy(alpha=.6f),Offset(px,py),Offset(px-2.dp.toPx(),py+5.dp.toPx()),1.dp.toPx(),StrokeCap.Round)}
             if(snow)repeat(7){i->val py=y+unit*.18f+((rain+i*.17f)%1f)*unit*.29f;drawCircle(Color.White,2.dp.toPx(),Offset(x-unit*.2f+i*unit*.065f,py))}

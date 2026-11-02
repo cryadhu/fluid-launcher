@@ -23,7 +23,7 @@ import androidx.core.view.WindowCompat
 import com.example.launcher.ui.Glyph
 import com.example.launcher.R
 
-data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Original")
+data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Dawn", val wallpaperImage:ImageBitmap?=null)
 val LocalGlass = staticCompositionLocalOf { GlassScene() }
 object F {
     val purple = Color(0xFF8051FF)
@@ -41,15 +41,17 @@ object F {
 }
 
 @Composable fun FluidTheme(config: FluidConfig, content: @Composable () -> Unit) {
+    val wallpaperContext=LocalContext.current
+    val wallpaperImage=remember { loadDawnWallpaper(wallpaperContext) }
     val dark = config.mode == "Dark" || config.mode == "Auto" && isSystemInDarkTheme()
     var dimensions by remember { mutableStateOf(Size(1080f,2400f)) }
     val view = LocalView.current; val activity = LocalContext.current as? Activity
     SideEffect { activity?.let { WindowCompat.getInsetsController(it.window, view).apply { isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark } } }
     var frosted by remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(dimensions, dark, config.homeWallpaper) {
-        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper)) }
+        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper,wallpaperImage=wallpaperImage)) }
     }
-    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted,config.homeWallpaper)) {
+    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted,config.homeWallpaper,wallpaperImage)) {
         val colors = if (dark) darkColorScheme() else lightColorScheme()
         MaterialTheme(colorScheme = colors.copy(primary = F.purple, onPrimary = Color.White, background = if (dark) Color(0xFF201A34) else Color(0xFFE8E3F3),
             surface = if (dark) Color(0xFF312842) else Color(0xFFF3EFFC), onSurface = F.ink, onBackground = F.ink),
@@ -64,6 +66,19 @@ object F {
 internal fun DrawScope.wallpaper(scene: GlassScene) {
     val w = scene.size.width; val h = scene.size.height
     val dark = scene.dark
+    if(scene.wallpaper=="Dawn") {
+        val image=scene.wallpaperImage
+        if(image!=null) {
+            // Exclude the navigation pill baked into the supplied reference.
+            val availableHeight=(image.height-48).coerceAtLeast(1)
+            val scale=maxOf(w/image.width,h/availableHeight)
+            val sourceWidth=(w/scale).toInt().coerceIn(1,image.width)
+            val sourceHeight=(h/scale).toInt().coerceIn(1,availableHeight)
+            drawImage(image,srcOffset=IntOffset((image.width-sourceWidth)/2,(availableHeight-sourceHeight)/2),srcSize=IntSize(sourceWidth,sourceHeight),dstSize=IntSize(w.toInt().coerceAtLeast(1),h.toInt().coerceAtLeast(1)),filterQuality=FilterQuality.High)
+        } else drawRect(Color(0xFFCACBD9),size=scene.size)
+        if(dark)drawRect(Color(0xFF151124).copy(alpha=.58f),size=scene.size)
+        return
+    }
     if(scene.wallpaper=="Lavender") {
         drawRect(Color(0xFFCACCD8),size=scene.size)
         val center=Offset(w*.18f,h*.76f)

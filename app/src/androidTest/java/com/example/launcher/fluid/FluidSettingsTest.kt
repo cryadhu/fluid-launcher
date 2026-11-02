@@ -23,17 +23,18 @@ class FluidSettingsTest {
         compose.onNodeWithContentDescription("Wallpaper",substring=false).performClick()
         compose.onNodeWithContentDescription("Home wallpaper: Original").assertExists()
         compose.onNodeWithContentDescription("Home wallpaper: Lavender").assertExists()
-        compose.onNodeWithContentDescription("Home wallpaper: Lavender").performClick()
-        compose.waitUntil(10000) { model.state.value.config.homeWallpaper=="Lavender" && !model.state.value.wallpaperApplying }
+        compose.onNodeWithContentDescription("Home wallpaper: Dawn").assertExists().performClick()
+        compose.waitUntil(10000) { model.state.value.config.homeWallpaper=="Dawn" && !model.state.value.wallpaperApplying }
         val manager=android.app.WallpaperManager.getInstance(ApplicationProvider.getApplicationContext<Application>())
         assertTrue(manager.getWallpaperId(android.app.WallpaperManager.FLAG_SYSTEM)>0)
         compose.onNodeWithText("Lock screen wallpaper").performScrollTo()
         compose.onNodeWithContentDescription("Lock wallpaper: Original").assertExists()
+        compose.onNodeWithContentDescription("Lock wallpaper: Dawn").assertExists()
         compose.onNodeWithContentDescription("Lock wallpaper: Lavender").assertExists()
         compose.onNodeWithContentDescription("Lock wallpaper: Lavender").performScrollTo().performClick()
         compose.waitUntil(10000) { model.state.value.config.lockWallpaper=="Lavender" && !model.state.value.wallpaperApplying }
         assertTrue(manager.getWallpaperId(android.app.WallpaperManager.FLAG_LOCK)>0)
-        pressBack()
+        compose.onNodeWithContentDescription("Back",substring=false).performClick()
         compose.onNodeWithTag("fluid-panel-Customize").assertExists()
     }
 }

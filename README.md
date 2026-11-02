@@ -419,3 +419,11 @@ Shared surfaces now use a Windows Start menu-inspired acrylic finish: stronger c
 Keep this styling preview local for review; no push is authorized for this update.
 
 Validation: 69 unit tests, release lint, signed APK verification and emulator visual checks in Light and Dark passed. No push was performed.
+
+### v1.1.11 — Dawn wallpaper, cloud artwork and notification shadows
+
+The supplied Dawn image is the default Home background. Both wallpaper pickers now offer Dawn, Original and Lavender in that order. Rendering crops out the navigation pill embedded in the supplied image. The selected wallpaper also feeds the acrylic backdrop sampling and Android wallpaper application.
+
+The automatic dock defaults to four app icons. Older automatic three-icon defaults migrate once, while new explicit choices and custom dock contents persist. Weather clouds use a shaded, multi-lobed silhouette with a rounded base and enough horizontal room for their drift animation. Notification shadows are enabled in the stacked and expanded views, with the clipping wrappers removed and room below the stack for the shadow.
+
+Validation: 70 unit tests, release lint, signed release build and three Android UI tests passed, including Dawn system wallpaper application and notification expand/collapse. Local emulator visual checks cover the new default background, four-app dock and notification shadow. This update remains local; no push is authorized.
