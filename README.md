@@ -411,11 +411,3 @@ Removed the Controls page; the page order is Markets, Home, Your Space. Add Brig
 The refresh glyph now uses a clean pair of circular arrows. Stock range changes keep the existing chart and card layout, with a small loader in each quote header rather than an extra loading text row. Notification expansion and collapse keep the same cards mounted while animating their position, width, height and stack spacing.
 
 Validation: 69 unit tests, release lint, signed release build and two Android UI tests passed, including control widget removal and intermediate card positions during notification expansion/collapse.
-
-### v1.1.9 — Local glass material preview
-
-Shared glass surfaces use a neutral smoke tint, directional reflected light, a brighter beveled rim, lower-edge shading and deeper soft shadows. The cached wallpaper refraction remains beneath crisp card content; the same material applies to widgets, notification stacks, the dock, app drawer and panels in both themes.
-
-This visual update is for local review only and must not be pushed as part of this change.
-
-Validation: 69 unit tests, release lint, signed APK verification, and local emulator visual/smoke checks passed. No remote push was performed for this preview.
