@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FluidConfigTest {
+    @Test fun homeAndLockWallpapersPersistIndependently() {
+        val config=FluidConfig(homeWallpaper="Lavender",lockWallpaper="Original")
+        assertEquals(config,decodeFluid(encodeFluid(config)))
+        assertEquals("Original",decodeFluid("{}").homeWallpaper)
+        assertEquals("Original",decodeFluid("""{"homeWallpaper":"unknown","lockWallpaper":"bad"}""").lockWallpaper)
+    }
     @Test fun newDesignDefaultsAreIndependentOfLegacyPages() {
         val config = FluidConfig()
         assertEquals(listOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.NOTIFICATIONS,FluidWidget.AGENDA),config.widgets)

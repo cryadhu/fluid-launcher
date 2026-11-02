@@ -1,5 +1,6 @@
 package com.example.launcher.fluid
 
+import androidx.compose.animation.core.*
 import android.content.Intent
 import android.net.Uri
 import android.graphics.BitmapFactory
@@ -33,9 +34,9 @@ internal fun parseStock(raw: String, symbol: String): StockQuote {
     val points = values?.let { a -> (0 until a.length()).mapNotNull { a.optDouble(it).takeIf(Double::isFinite)?.toFloat() } }.orEmpty()
     return StockQuote(symbol, meta.optString("shortName", symbol), price, meta.optString("currency"), if(previous > 0) (price-previous)/previous*100 else 0.0, points, meta.optLong("regularMarketTime")*1000)
 }
-private suspend fun quote(symbol: String, range: String, cache: MarketNewsCache): StockQuote = withContext(Dispatchers.IO) {
+private suspend fun quote(symbol: String, range: String, cache: MarketNewsCache, force: Boolean): StockQuote = withContext(Dispatchers.IO) {
     val interval = if(range == "1d") "5m" else "1d"
-    parseStock(cache.get("https://query1.finance.yahoo.com/v8/finance/chart/${URLEncoder.encode(symbol,"UTF-8")}?range=$range&interval=$interval", ::getHttps), symbol)
+    parseStock(cache.get("https://query1.finance.yahoo.com/v8/finance/chart/${URLEncoder.encode(symbol,"UTF-8")}?range=$range&interval=$interval", ::getHttps, force), symbol)
 }
 
 @Composable internal fun FluidMarkets(state: FluidState, model: FluidModel, modifier: Modifier, settings: () -> Unit) {
@@ -48,24 +49,29 @@ private suspend fun quote(symbol: String, range: String, cache: MarketNewsCache)
     var stockError by remember { mutableStateOf<String?>(null) }
     var newsError by remember { mutableStateOf<String?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
+    var manualRefresh by remember { mutableIntStateOf(0) }
+    var stockManualHandled by remember { mutableIntStateOf(0) }
+    var newsManualHandled by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while(true) { delay(60_000); refresh++ } }
-    LaunchedEffect(state.config.stockSymbols, range, refresh) {
+    LaunchedEffect(state.config.stockSymbols, range, refresh, manualRefresh) {
+        val force = manualRefresh > stockManualHandled; stockManualHandled = manualRefresh
         loading = true; stockError = null
         val symbols = state.config.stockSymbols.split(',').map { it.trim().uppercase() }.filter { it.isNotEmpty() }.distinct().take(8)
-        val results = coroutineScope { symbols.map { symbol -> async { try { quote(symbol, range, cache) } catch(e: Exception) { if(e is CancellationException) throw e; null } } }.awaitAll() }
+        val results = coroutineScope { symbols.map { symbol -> async { try { quote(symbol, range, cache, force) } catch(e: Exception) { if(e is CancellationException) throw e; null } } }.awaitAll() }
         stocks = results.filterNotNull(); loading = false
         if(stocks.size < symbols.size) stockError = "Some quotes are unavailable. Check your symbols or retry."
     }
-    LaunchedEffect(state.config.newsTopics, refresh) {
+    LaunchedEffect(state.config.newsTopics, refresh, manualRefresh) {
+        val force = manualRefresh > newsManualHandled; newsManualHandled = manualRefresh
         newsError = null
-        try { val batch = PublicNewsRepository { cache.get(it, ::getHttps) }.topStories(state.config.newsTopics); news = batch.stories; if(batch.failed.isNotEmpty()) newsError = "Some news topics could not update. Try refreshing." }
+        try { val batch = PublicNewsRepository { cache.get(it, ::getHttps, force) }.topStories(state.config.newsTopics); news = batch.stories; if(batch.failed.isNotEmpty()) newsError = "Some news topics could not update. Try refreshing." }
         catch(e: Exception) { if(e is CancellationException) throw e; newsError = "News unavailable. Check your connection." }
     }
     Column(modifier.verticalScroll(rememberScrollState()).padding(bottom=110.dp).testTag("fluid-markets"), verticalArrangement=Arrangement.spacedBy(16.dp)) {
         FluidHeading("Markets & news", "Your world, at a glance") { GlassIcon("settings", "Market & news settings", onClick=settings) }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             GlassButton(state.config.market, glyph="settings", onClick=settings)
-            Text("Updates every 10 min",style=F.text(11,muted=true),modifier=Modifier.padding(vertical=14.dp))
+            GlassIcon("refresh","Refresh stocks and headlines") { manualRefresh++ }
         }
         Text("STOCK WATCH", style=F.text(11,true,muted=true))
         if(loading) Text("Updating quotes…", style=F.text(13,muted=true))
@@ -102,12 +108,18 @@ private suspend fun quote(symbol: String, range: String, cache: MarketNewsCache)
 @Composable private fun StockChart(points: List<Float>) {
     val color = F.purple
     if(points.size < 2) { Text("Chart unavailable",style=F.text(11,muted=true)); return }
+    val min = points.min(); val span = (points.max()-min).coerceAtLeast(.01f)
+    val samples = (0 until 48).map { i ->
+        val index = i * (points.size-1) / 47f
+        val left = index.toInt(); val right = (left+1).coerceAtMost(points.lastIndex)
+        ((points[left] + (points[right]-points[left])*(index-left)-min)/span).coerceIn(0f,1f)
+    }
+    val animated = samples.map { target -> animateFloatAsState(target,tween(650,easing=FastOutSlowInEasing),label="Chart shape").value }
     Canvas(Modifier.fillMaxWidth().height(100.dp)) {
-        val min = points.min(); val span = (points.max()-min).coerceAtLeast(.01f)
         val path = Path()
-        points.forEachIndexed { i,p -> val x=i*size.width/(points.size-1); val y=size.height-8.dp.toPx()-(p-min)/span*(size.height-16.dp.toPx()); if(i==0) path.moveTo(x,y) else path.lineTo(x,y) }
+        animated.forEachIndexed { i,p -> val x=i*size.width/47; val y=size.height-8.dp.toPx()-p*(size.height-16.dp.toPx()); if(i==0) path.moveTo(x,y) else path.lineTo(x,y) }
         drawPath(path,Brush.horizontalGradient(listOf(Color(0xFFB45ACA),color,Color(0xFF539BE9))),style=Stroke(2.dp.toPx()))
-        val y=size.height-8.dp.toPx()-(points.last()-min)/span*(size.height-16.dp.toPx())
+        val y=size.height-8.dp.toPx()-animated.last()*(size.height-16.dp.toPx())
         drawCircle(color.copy(alpha=.14f),9.dp.toPx(),Offset(size.width,y)); drawCircle(color,4.dp.toPx(),Offset(size.width,y))
     }
 }

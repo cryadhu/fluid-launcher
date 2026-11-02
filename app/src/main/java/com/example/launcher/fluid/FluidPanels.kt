@@ -95,10 +95,10 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).clickable(role=Role.Button,onClick=click).padding(vertical=13.dp,horizontal=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {Glyph(glyph,F.purple,Modifier.size(21.dp));Text(title,style=F.text(13))}
 }
 
-@Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit) {
+@Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit,back:()->Unit) {
     Box(Modifier.fillMaxSize().background(Color(0xFF40315E).copy(alpha=.08f)).statusBarsPadding().padding(top=10.dp)) {
         Column(Modifier.fillMaxSize().glass(36.dp,strength=1.15f).testTag("fluid-panel-$name")) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick={if(name=="Customize")close()else navigate("Customize")});Column(Modifier.weight(1f).padding(start=13.dp)){Text(name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Apps that belong together";"Settings"->"Make it feel like you";else->"Your home, in your flow"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
+            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=back);Column(Modifier.weight(1f).padding(start=13.dp)){Text(name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Apps that belong together";"Settings"->"Make it feel like you";else->"Your home, in your flow"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                 when(name) {
                     "Widgets", "Space widgets" -> {
@@ -131,6 +131,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             }
                         }
                     }
+                    "Wallpaper" -> { WallpaperSettings(state,model) }
                     "Dock" -> { DockSettings(state, model) }
                     "Market & news settings" -> { MarketNewsSettings(state, model) }
                     "Settings" -> {
@@ -163,6 +164,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             Row(Modifier.fillMaxWidth().padding(top=22.dp),horizontalArrangement=Arrangement.SpaceEvenly){
                                 Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("app","Widget gallery",primary=true){navigate("Widgets")};Text("Widgets",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
                                 Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("weather","Appearance"){navigate("Settings")};Text("Theme",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
+                                Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("image","Wallpaper"){navigate("Wallpaper")};Text("Wallpaper",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
                                 Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("files","Organize spaces"){navigate("Spaces")};Text("Spaces",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
                                 Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("settings","Home settings"){navigate("Settings")};Text("Settings",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
                             }

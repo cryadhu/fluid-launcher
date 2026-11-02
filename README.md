@@ -393,3 +393,13 @@ The app is now named Fluid Launcher with application ID `com.cry.fluid` and the 
 Home-button returns spring smoothly to Home, whose page marker is now a small house. Markets & News saves responses in app storage across restarts and checks the 10-minute refresh window while the page is active. Stock symbols/ranges and individual news sources have separate cache entries; unavailable sources keep their last successful data and wait 10 minutes before retrying. Changing to an uncached selection loads it immediately.
 
 Validation: 66 unit tests, Android navigation UI test, release lint, signed APK verification, and installation/HOME launch under the new package ID passed. The existing release key was reused.
+
+### v1.1.7 — Refresh, charts, settings and wallpapers
+
+Markets & News now has an icon-only refresh control that updates both stocks and headlines immediately, bypassing their normal 10-minute cache window. Stock charts smoothly morph between 1D, 1M, 3M and 1Y data. Theme choices are centered, and Android Back follows the same panel history as the toolbar Back button.
+
+Customize now includes Wallpaper. Home screen and lock screen have separate selections, each offering Original and the new Lavender design recreated from the supplied reference without its status icons. Selecting a Home wallpaper updates both the launcher background (including glass sampling) and Android's system wallpaper; selecting a lock wallpaper updates Android's lock wallpaper independently. Selection is saved after successful application, and the operation survives Android's wallpaper-driven activity recreation.
+
+Wallpaper application uses Android's [WallpaperManager](https://developer.android.com/reference/android/app/WallpaperManager) system and lock flags. Each image is rendered at device dimensions from the same artwork used in the launcher previews.
+
+Validation: 68 unit tests, two Android UI tests (including real system/lock wallpaper application and panel Back navigation), release lint, and signed release build passed. The local JBR 17 G1 runtime crashed during optimization; the successful build used Serial GC without changing app release settings.

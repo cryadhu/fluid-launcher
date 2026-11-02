@@ -33,4 +33,11 @@ class MarketNewsCacheTest {
         assertEquals(1, failures)
         assertFalse(marketNewsFresh(time, time - 1))
     }
+    @Test fun manualRefreshBypassesFreshCacheAndUpdatesSavedData() {
+        val directory=temp.newFolder()
+        val cache=MarketNewsCache(directory) { 1000L }
+        assertEquals("first",cache.get("news") { "first" })
+        assertEquals("latest",cache.get("news", { "latest" },force=true))
+        assertEquals("latest",MarketNewsCache(directory) { 1001L }.get("news") { error("Should use saved response") })
+    }
 }

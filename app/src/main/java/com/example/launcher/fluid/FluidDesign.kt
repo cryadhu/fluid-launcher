@@ -23,7 +23,7 @@ import androidx.core.view.WindowCompat
 import com.example.launcher.ui.Glyph
 import com.example.launcher.R
 
-data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null)
+data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Original")
 val LocalGlass = staticCompositionLocalOf { GlassScene() }
 object F {
     val purple = Color(0xFF8051FF)
@@ -46,10 +46,10 @@ object F {
     val view = LocalView.current; val activity = LocalContext.current as? Activity
     SideEffect { activity?.let { WindowCompat.getInsetsController(it.window, view).apply { isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark } } }
     var frosted by remember { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(dimensions, dark) {
-        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark)) }
+    LaunchedEffect(dimensions, dark, config.homeWallpaper) {
+        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper)) }
     }
-    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted)) {
+    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted,config.homeWallpaper)) {
         val colors = if (dark) darkColorScheme() else lightColorScheme()
         MaterialTheme(colorScheme = colors.copy(primary = F.purple, onPrimary = Color.White, background = if (dark) Color(0xFF201A34) else Color(0xFFE8E3F3),
             surface = if (dark) Color(0xFF312842) else Color(0xFFF3EFFC), onSurface = F.ink, onBackground = F.ink),
@@ -64,6 +64,15 @@ object F {
 internal fun DrawScope.wallpaper(scene: GlassScene) {
     val w = scene.size.width; val h = scene.size.height
     val dark = scene.dark
+    if(scene.wallpaper=="Lavender") {
+        drawRect(Color(0xFFCACCD8),size=scene.size)
+        val center=Offset(w*.18f,h*.76f)
+        scale(1f,1.45f,pivot=center) {
+            drawCircle(Brush.radialGradient(listOf(Color(0xFFB5A6F0),Color(0xFFB8ACF0),Color(0x00B8ACF0)),center,w*1.02f),w*1.02f,center)
+        }
+        if(dark)drawRect(Color(0xFF151124).copy(alpha=.58f),size=scene.size)
+        return
+    }
     drawRect(Brush.linearGradient(if (dark) listOf(Color(0xFF373147),Color(0xFF231C38),Color(0xFF4B386E)) else listOf(Color(0xFFD7DDDA),Color(0xFFEAECE7),Color(0xFFEED9C6)), end = Offset(w,h)), size = scene.size)
     val wave = Path().apply { moveTo(-w*.2f,h*.86f); cubicTo(w*.08f,h*.5f,w*.44f,h*.28f,w*1.2f,h*.22f); lineTo(w*1.2f,h*1.2f); lineTo(-w*.2f,h*1.2f); close() }
     drawPath(wave, Brush.linearGradient(if (dark) listOf(Color(0xFF9B6BA9),Color(0xFF574889),Color(0xFF322844)) else listOf(Color(0xFFF3F0E8),Color(0xFFDCE4DF),Color(0xFFF0D7BC)), Offset(w*.9f,h*.22f), Offset(w*.15f,h*.99f)))
@@ -110,7 +119,7 @@ fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Floa
     val base = modifier.softPress(interaction).heightIn(min = 44.dp)
     Row((if (primary) base.clip(RoundedCornerShape(50)).background(Brush.linearGradient(listOf(F.lilac,F.purple))) else base.glass(24.dp))
         .clickable(interaction, indication = null, role = Role.Button, onClick = onClick).padding(horizontal = 18.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
         glyph?.let { Glyph(it, if (primary) Color.White else F.purple, Modifier.size(18.dp)) }
         Text(label, style = F.text(12, true), color = if (primary) Color.White else F.ink)
     }

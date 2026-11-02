@@ -21,9 +21,10 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Light", val labels: Boolean = true,
-    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 3, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true, val tools: Set<String> = emptySet(), val spaceWidgets: List<FluidWidget> = listOf(FluidWidget.TASKS))
+    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 3, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true, val tools: Set<String> = emptySet(), val spaceWidgets: List<FluidWidget> = listOf(FluidWidget.TASKS), val homeWallpaper:String="Original", val lockWallpaper:String="Original")
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
     put("tools",JSONArray(config.tools.toList()));put("spaceWidgets",JSONArray(config.spaceWidgets.map{it.name}))
+    put("homeWallpaper",config.homeWallpaper);put("lockWallpaper",config.lockWallpaper)
     put("autoWeather",config.autoWeather)
     put("dockCount", config.dockCount); put("dockLabels", config.dockLabels); put("dockIconSize", config.dockIconSize); put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
@@ -37,11 +38,11 @@ fun decodeFluid(raw: String): FluidConfig = runCatching {
     val sizes = FluidWidget.entries.mapNotNull { kind -> j.optJSONObject("sizes")?.optString(kind.name)?.takeIf { it in listOf("Compact","Standard","Large") }?.let { kind to it } }.toMap()
     FluidConfig(widgets,
         j.optString("mode", "Light").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Light", j.optBoolean("labels", true),
-        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",3).coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true),list("tools").toSet(),if(j.has("spaceWidgets"))list("spaceWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}.distinct()else listOf(FluidWidget.TASKS))
+        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",3).coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true),list("tools").toSet(),if(j.has("spaceWidgets"))list("spaceWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}.distinct()else listOf(FluidWidget.TASKS)).copy(homeWallpaper=j.optString("homeWallpaper","Original").takeIf{it in listOf("Original","Lavender")} ?: "Original",lockWallpaper=j.optString("lockWallpaper","Original").takeIf{it in listOf("Original","Lavender")} ?: "Original")
 }.getOrDefault(FluidConfig())
 
 data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<InstalledApp> = emptyList(), val loading: Boolean = true,
-    val device: DeviceState = DeviceState(), val now: Long = System.currentTimeMillis(), val homeEpoch: Int = 0,
+    val device: DeviceState = DeviceState(), val now: Long = System.currentTimeMillis(), val homeEpoch: Int = 0, val wallpaperApplying:Boolean=false,
     val tasks: List<FluidTask> = emptyList(), val weather: HomeWeather? = null, val weatherLoading: Boolean = false,
     val weatherError: String? = null, val storageUsed: Long = 0, val storageTotal: Long = 1, val message: String? = null,
     val steps: Int? = null)
@@ -82,6 +83,20 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         mutable.update { it.copy(config = config) }; prefs.edit().putString("config", encodeFluid(config)).apply()
     }
     fun toggleWidget(widget: FluidWidget) = configure { it.copy(widgets = if (widget in it.widgets) it.widgets - widget else it.widgets + widget) }
+    fun applyWallpaper(style:String,lock:Boolean,dark:Boolean) {
+        if(mutable.value.wallpaperApplying || style !in listOf("Original","Lavender")) return
+        mutable.update { it.copy(wallpaperApplying=true) }
+        viewModelScope.launch {
+            try {
+                applySystemWallpaper(getApplication(),style,lock,dark)
+                configure { if(lock)it.copy(lockWallpaper=style)else it.copy(homeWallpaper=style) }
+                message(if(lock)"Lock screen wallpaper updated"else"Home wallpaper updated")
+            } catch(e:Exception) {
+                if(e is CancellationException)throw e
+                message(e.message ?: "Could not apply wallpaper")
+            } finally { mutable.update { it.copy(wallpaperApplying=false) } }
+        }
+    }
     fun resizeWidget(widget: FluidWidget, size: String) {
         if(size in listOf("Compact","Standard","Large")) configure { it.copy(sizes = it.sizes + (widget to size)) }
     }

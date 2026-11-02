@@ -68,8 +68,9 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
     var drawer by remember { mutableStateOf(false) }
     var drawerGesture by remember { mutableStateOf<Float?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
-    var panel by remember { mutableStateOf<String?>(null) }
-    var lastPanel by remember { mutableStateOf("Customize") }
+    var panel by rememberSaveable { mutableStateOf<String?>(null) }
+    var panelHistory by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var lastPanel by rememberSaveable { mutableStateOf("Customize") }
     var appMenu by remember { mutableStateOf<InstalledApp?>(null) }
     var searchFocused by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf("All") }
@@ -109,16 +110,19 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
             }
         }
     }
-    fun showPanel(name: String) { focus.clearFocus(); keyboard?.hide(); lastPanel=name; panel=name }
+    fun showPanel(name: String) { focus.clearFocus(); keyboard?.hide(); panelHistory=emptyList(); lastPanel=name; panel=name }
+    fun panelBack() { if(panelHistory.isNotEmpty()) { val previous=panelHistory.last(); panelHistory=panelHistory.dropLast(1); lastPanel=previous; panel=previous } else panel=null }
+    fun navigatePanel(name:String) { if(name!=panel) { panel?.let { panelHistory=panelHistory+it }; lastPanel=name; panel=name } }
     fun openDrawer(focused: Boolean = false) { search=""; searchFocused=focused; drawer=true }
     fun launch(app: InstalledApp, rect: Rect) {
         if(launching!=null) return
         focus.clearFocus(); keyboard?.hide(); launchRect=rect; launching=app
         scope.launch { delay(170); model.launch(app); delay(260); launching=null; drawer=false; search=""; pager.scrollToPage(HOME_PAGE) }
     }
-    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0) { drawerGesture=null; widgetEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.9f,320f)) } }
+    var handledHomeEpoch by rememberSaveable { mutableIntStateOf(state.homeEpoch) }
+    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0 && state.homeEpoch!=handledHomeEpoch) { handledHomeEpoch=state.homeEpoch; drawerGesture=null; widgetEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.9f,320f)) } }
     BackHandler {
-        when { widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panel=null; drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
+        when { widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panelBack(); drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
@@ -152,7 +156,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
             AnimatedContent(targetState=panel ?: lastPanel,transitionSpec={
                 (fadeIn(tween(210))+slideInHorizontally(spring(.95f,350f)){it/10}) togetherWith (fadeOut(tween(130))+slideOutHorizontally(tween(190)){-it/16})
             },label="Glass panel navigation") { name ->
-                FluidPanel(name,state,model,chooseHome,{panel=null},{lastPanel=it;panel=it},calendarAccess,activityAccess)
+                FluidPanel(name,state,model,chooseHome,{panel=null},::navigatePanel,calendarAccess,activityAccess,::panelBack)
             }
         }
         AnimatedVisibility(appMenu!=null,enter=fadeIn(tween(110))+scaleIn(spring(.75f,450f),initialScale=.9f),exit=fadeOut(tween(100))+scaleOut(tween(130),targetScale=.96f)) {
