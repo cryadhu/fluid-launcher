@@ -47,7 +47,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     LaunchedEffect(ready,focusSearch,inputReady){if(ready && focusSearch && inputReady){requester.requestFocus();keyboard?.show()}}
     LaunchedEffect(query,tab){grid.scrollToItem(0)}
     val filtered=remember(state.apps,state.config.work,state.config.personal,state.config.tools,query,tab){fluidFilteredApps(state.apps,state.config,query,tab)}
-    val suggested=remember(state.apps){state.apps.sortedByDescending { it.firstInstalledAt }.take(4)}
+    val favorites=remember(state.apps,state.config.favoriteApps){state.apps.filter { it.component.flattenToString() in state.config.favoriteApps }.take(4)}
     Column(Modifier.fillMaxSize().glass(36.dp,strength=1.12f).imePadding().testTag("fluid-app-drawer")) {
         Box(Modifier.fillMaxWidth().height(28.dp).clickable(onClick=close).pointerInput(Unit){detectVerticalDragGestures(onDragStart={pullDistance=0f},onVerticalDrag={change,y->change.consume();pullDistance=(pullDistance+y).coerceAtLeast(0f);pull(pullDistance)},onDragEnd={finishPull(pullDistance)},onDragCancel={finishPull(0f)})}.semantics { contentDescription="Close app drawer"; onClick {close();true} },contentAlignment=Alignment.Center){Box(Modifier.width(34.dp).height(4.dp).clip(CircleShape).background(F.muted.copy(alpha=.35f)))}
         Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -63,9 +63,9 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
             }
         }
         LazyVerticalGrid(GridCells.Fixed(4),Modifier.weight(1f).fillMaxWidth().testTag("fluid-app-grid"),state=grid,contentPadding=PaddingValues(start=18.dp,end=18.dp,bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+30.dp),verticalArrangement=Arrangement.spacedBy(14.dp),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
-            if(query.isBlank() && tab=="All" && suggested.isNotEmpty()) {
-                item(span={GridItemSpan(4)}) { Text("Suggested",style=F.text(11,muted=true),modifier=Modifier.padding(top=2.dp,bottom=4.dp)) }
-                item(span={GridItemSpan(4)}) { Row(Modifier.fillMaxWidth().glass(28.dp).padding(horizontal=7.dp,vertical=5.dp)) { suggested.forEach { app -> FluidAppTile(app,badges,state.config.labels,launch,options,Modifier.weight(1f)) } } }
+            if(query.isBlank() && tab=="All" && favorites.isNotEmpty()) {
+                item(span={GridItemSpan(4)}) { Text("Favorites",style=F.text(11,muted=true),modifier=Modifier.padding(top=2.dp,bottom=4.dp)) }
+                item(span={GridItemSpan(4)}) { Row(Modifier.fillMaxWidth().glass(28.dp).padding(horizontal=7.dp,vertical=5.dp)) { favorites.forEach { app -> FluidAppTile(app,badges,state.config.labels,launch,options,Modifier.weight(1f)) };repeat(4-favorites.size){Spacer(Modifier.weight(1f))} } }
                 item(span={GridItemSpan(4)}) { Text("All apps",style=F.text(11,muted=true),modifier=Modifier.padding(top=10.dp,bottom=1.dp)) }
             }
             if(filtered.isEmpty())item(span={GridItemSpan(4)}) {
@@ -78,10 +78,11 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
 
 @Composable internal fun FluidAppOptions(app:InstalledApp,state:FluidState,model:FluidModel,dismiss:()->Unit) {
     val key=app.component.flattenToString()
-    Box(Modifier.fillMaxSize().background(Color(0xFF2E204B).copy(alpha=.1f)).clickable(interactionSource=remember{MutableInteractionSource()},indication=null,onClick=dismiss).statusBarsPadding().navigationBarsPadding().imePadding().padding(24.dp),contentAlignment=Alignment.Center) {
-        Column(Modifier.widthIn(max=340.dp).fillMaxWidth().glass(32.dp,true).clickable(interactionSource=remember{MutableInteractionSource()},indication=null){}.padding(20.dp).testTag("fluid-app-options"),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically){if(app.artwork!=null)Image(app.artwork.asImageBitmap(),null,Modifier.size(42.dp));Text(app.label,style=F.text(18,true),modifier=Modifier.weight(1f).padding(horizontal=12.dp),maxLines=2);GlassIcon("close","Close app options",Modifier.size(32.dp),onClick=dismiss)}
+    Box(Modifier.fillMaxSize().background(Color(0xFF2E204B).copy(alpha=.10f)).statusBarsPadding().navigationBarsPadding().padding(top=8.dp)) {
+        Column(Modifier.fillMaxSize().glass(36.dp,strength=1.15f).padding(20.dp).testTag("fluid-app-options"),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=dismiss);if(app.artwork!=null)Image(app.artwork.asImageBitmap(),null,Modifier.size(42.dp).padding(start=12.dp));Text(app.label,style=F.text(22,true),modifier=Modifier.weight(1f).padding(horizontal=12.dp),maxLines=2);GlassIcon("close","Close app options",Modifier.size(36.dp),onClick=dismiss)}
             Spacer(Modifier.height(10.dp))
+            OptionRow("app",if(key in state.config.favoriteApps)"Remove from favorites"else"Add to favorites"){model.toggleFavoriteApp(key);dismiss()}
             OptionRow("files",if(key in state.config.work)"Remove from Work"else"Add to Work"){model.assign(app,if(key in state.config.work)"None"else"Work");dismiss()}
             OptionRow("contacts",if(key in state.config.personal)"Remove from Personal"else"Add to Personal"){model.assign(app,if(key in state.config.personal)"None"else"Personal");dismiss()}
             OptionRow("settings",if(key in state.config.tools)"Remove from Tools"else"Add to Tools"){model.assign(app,if(key in state.config.tools)"None"else"Tools");dismiss()}

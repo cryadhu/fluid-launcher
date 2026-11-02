@@ -469,3 +469,7 @@ Plan is a fourth page after Your Space. It brings together the day’s calendar,
 ### v1.1.18 — Refined app drawer
 
 The app drawer now uses a compact search and filter header, outlined All/Work/Play/Tools tabs, a glass Suggested row of recent apps, and a clearer All apps grid. Existing Personal assignments remain available through the Play tab.
+
+### v1.1.19 — Drawer favorites
+
+The drawer’s former Suggested row is now Favorites. Long-press any app and select Add to favorites; the selection persists and appears at the top of All. The long-press action menu is now a full-screen glass page rather than a centered sheet.
