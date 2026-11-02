@@ -443,3 +443,9 @@ Validation: 71 unit tests, two Android tests (custom import, pixel-identical wal
 Theme selection again changes the complete launcher palette, including the wallpaper treatment: Dark mode applies the intended dark veil to Dawn, Original, Lavender and custom-photo wallpapers. Custom wallpaper upload and the separate Home/lock selections remain available.
 
 Light, Dark and Auto now only control Fluid Launcher's own appearance. They no longer request a system-wide Android theme change or send the user to Android Display settings.
+
+### v1.1.14 — Responsive home widgets
+
+The analogue clock now initializes its seconds hand at the current time, then moves continuously through the nearest next second instead of sweeping a full dial after returning Home. The weather cloud has a shorter silhouette. Dark Dawn and Lavender wallpapers use a lighter dark veil so their artwork remains visible.
+
+Today at Work includes an inline task field and add button in the widget itself. The notifications widget also reconciles with Android's active notification list every four seconds while visible, covering devices that omit a notification-removal callback.

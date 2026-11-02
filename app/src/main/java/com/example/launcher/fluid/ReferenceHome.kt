@@ -71,11 +71,12 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
 @Composable internal fun AnalogClock(now:Long,modifier:Modifier=Modifier,click:()->Unit={}) {
     val edit=LocalWidgetEdit.current
     val time=Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
-    // Unwrapped angles keep the hands moving forward across minute/hour boundaries.
-    val start=remember{now}
-    val initial=remember{time.hour%12*3600+time.minute*60+time.second}
-    val secondTarget=(initial+(now-start)/1000f)*6f
-    val seconds by animateFloatAsState(secondTarget,tween(950,easing=LinearEasing),label="Clock seconds")
+    // Keep an unwrapped angle so the hand crosses 59 -> 00 naturally. The first
+    // frame is snapped to real time instead of animating all the way from 12.
+    val secondTarget=((time.hour % 12)*3600+time.minute*60+time.second+time.nano/1_000_000_000f)*6f
+    val secondHand=remember { Animatable(secondTarget) }
+    LaunchedEffect(secondTarget) { secondHand.animateTo(secondTarget,tween(950,easing=LinearEasing)) }
+    val seconds=secondHand.value
     val ink=F.ink
     val face=if(LocalGlass.current.dark)Color(0xFF35403D)else Color.White
     BoxWithConstraints(modifier.combinedClickable(onClick=click,onLongClick={edit(FluidWidget.CLOCK)}).semantics{contentDescription="Clock ${fluidDate(now,"HH:mm")}"},contentAlignment=Alignment.Center) {
@@ -133,7 +134,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                 }
                 val top=if(wet)Color(0xFFC1CCD7)else if(night)Color(0xFFD3DFE9)else Color(0xFFFAFCFF)
                 val bottom=if(wet)Color(0xFF7C8F9F)else Color(0xFFC4D2DE)
-                scale(.76f,1f,pivot=Offset(x,y)) {
+                scale(.76f,.70f,pivot=Offset(x,y)) {
                     drawPath(cloud,Brush.verticalGradient(listOf(top,bottom),y-unit*.27f,y+unit*.18f))
                     drawPath(cloud,Color.White.copy(alpha=.30f),style=Stroke(.6.dp.toPx()))
                 }

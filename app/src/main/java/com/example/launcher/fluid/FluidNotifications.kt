@@ -12,6 +12,8 @@ object FluidNotifications {
     internal val mutable = MutableStateFlow<List<FluidNotification>>(emptyList())
     val items = mutable.asStateFlow()
     internal var cancel: ((String) -> Unit)? = null
+    internal var refresh: (() -> Unit)? = null
     fun dismiss(key: String) { runCatching { cancel?.invoke(key) } }
     fun clear() { items.value.filter { it.clearable }.forEach { dismiss(it.key) } }
+    fun reconcile() { runCatching { refresh?.invoke() } }
 }

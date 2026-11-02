@@ -23,6 +23,7 @@ import com.example.launcher.ui.Glyph
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.delay
 import kotlin.math.*
 
 internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String =
@@ -34,6 +35,9 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
     var expanded by rememberSaveable { mutableStateOf(detail) }
     val size=state.config.sizes[FluidWidget.NOTIFICATIONS] ?: "Standard"
     val compactHeight=when(size) { "Compact"->88.dp;"Large"->112.dp;else->96.dp }
+    // Some OEM listener implementations miss a removal callback. Reconcile against
+    // Android's active list while this widget is visible so stale cards disappear.
+    LaunchedEffect(Unit) { while(true) { FluidNotifications.reconcile(); delay(4_000) } }
     LaunchedEffect(notifications.isEmpty()) { if(notifications.isEmpty()) expanded=false }
     Column(Modifier.fillMaxWidth().padding(bottom=20.dp).testTag("fluid-widget-NOTIFICATIONS")) {
         Row(Modifier.fillMaxWidth().padding(horizontal=7.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {

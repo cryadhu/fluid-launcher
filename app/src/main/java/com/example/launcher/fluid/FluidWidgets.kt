@@ -141,10 +141,11 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                     if(detail) TextButton(onClick={model.removeTask(task)}) { Text("×",color=F.muted) }
                 }
             }
-            if(detail) {
-                var draft by remember { mutableStateOf("") }
-                Spacer(Modifier.height(16.dp)); FluidField(draft,"A new task…",{draft=it})
-                GlassButton("Add task",Modifier.padding(top=12.dp),primary=true,glyph="plus") { model.addTask(draft); draft="" }
+            var draft by remember { mutableStateOf("") }
+            Spacer(Modifier.height(if(detail) 16.dp else 10.dp))
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
+                FluidField(draft,"Add a task…",{draft=it},Modifier.weight(1f))
+                GlassIcon("plus","Add task",primary=draft.isNotBlank()) { model.addTask(draft); draft="" }
             }
         }
         FluidWidget.STORAGE -> {

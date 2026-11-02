@@ -25,10 +25,14 @@ class MediaAccessService : NotificationListenerService() {
                 extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString().orEmpty(), n.postTime, icon, n.notification.contentIntent, n.isClearable)
         }
     }
-    override fun onListenerConnected() { com.example.launcher.fluid.FluidNotifications.cancel = { cancelNotification(it) }; publish() }
+    override fun onListenerConnected() {
+        com.example.launcher.fluid.FluidNotifications.cancel = { cancelNotification(it) }
+        com.example.launcher.fluid.FluidNotifications.refresh = ::publish
+        publish()
+    }
     override fun onNotificationPosted(sbn: StatusBarNotification?) { publish() }
     override fun onNotificationRemoved(sbn: StatusBarNotification?) { publish() }
-    override fun onListenerDisconnected() { NotificationBadges.mutable.value = emptySet(); com.example.launcher.fluid.FluidNotifications.mutable.value = emptyList(); com.example.launcher.fluid.FluidNotifications.cancel = null }
+    override fun onListenerDisconnected() { NotificationBadges.mutable.value = emptySet(); com.example.launcher.fluid.FluidNotifications.mutable.value = emptyList(); com.example.launcher.fluid.FluidNotifications.cancel = null; com.example.launcher.fluid.FluidNotifications.refresh = null }
     override fun onDestroy() { onListenerDisconnected(); super.onDestroy() }
 }
 /** No window-content access. Only the explicit double-tap lock gesture invokes it. */

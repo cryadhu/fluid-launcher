@@ -89,7 +89,8 @@ private fun DrawScope.drawWallpaper(scene: GlassScene) {
             val sourceHeight=(h/scale).toInt().coerceIn(1,availableHeight)
             drawImage(image,srcOffset=IntOffset((image.width-sourceWidth)/2,(availableHeight-sourceHeight)/2),srcSize=IntSize(sourceWidth,sourceHeight),dstSize=IntSize(w.toInt().coerceAtLeast(1),h.toInt().coerceAtLeast(1)),filterQuality=FilterQuality.High)
         } else drawRect(Color(0xFFCACBD9),size=scene.size)
-        if(dark)drawRect(Color(0xFF151124).copy(alpha=.58f),size=scene.size)
+        // Retain wallpaper detail in Dark mode instead of allowing it to read blank.
+        if(dark)drawRect(Color(0xFF151124).copy(alpha=.30f),size=scene.size)
         return
     }
     if(scene.wallpaper=="Lavender") {
@@ -98,7 +99,7 @@ private fun DrawScope.drawWallpaper(scene: GlassScene) {
         scale(1f,1.45f,pivot=center) {
             drawCircle(Brush.radialGradient(listOf(Color(0xFFB5A6F0),Color(0xFFB8ACF0),Color(0x00B8ACF0)),center,w*1.02f),w*1.02f,center)
         }
-        if(dark)drawRect(Color(0xFF151124).copy(alpha=.58f),size=scene.size)
+        if(dark)drawRect(Color(0xFF151124).copy(alpha=.30f),size=scene.size)
         return
     }
     drawRect(Brush.linearGradient(if (dark) listOf(Color(0xFF373147),Color(0xFF231C38),Color(0xFF4B386E)) else listOf(Color(0xFFD7DDDA),Color(0xFFEAECE7),Color(0xFFEED9C6)), end = Offset(w,h)), size = scene.size)
