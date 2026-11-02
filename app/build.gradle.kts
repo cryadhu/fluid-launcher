@@ -17,11 +17,11 @@ android {
     namespace = "com.example.launcher"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.example.launcher"
+        applicationId = "com.cry.fluid"
         minSdk = 26
         targetSdk = 35
-        versionCode = 50
-        versionName = "1.1.5"
+        versionCode = 51
+        versionName = "1.1.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }

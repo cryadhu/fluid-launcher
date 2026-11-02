@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
 import androidx.compose.ui.unit.dp
 import com.example.launcher.data.*
 import kotlinx.coroutines.*
@@ -31,12 +33,14 @@ internal fun parseStock(raw: String, symbol: String): StockQuote {
     val points = values?.let { a -> (0 until a.length()).mapNotNull { a.optDouble(it).takeIf(Double::isFinite)?.toFloat() } }.orEmpty()
     return StockQuote(symbol, meta.optString("shortName", symbol), price, meta.optString("currency"), if(previous > 0) (price-previous)/previous*100 else 0.0, points, meta.optLong("regularMarketTime")*1000)
 }
-private suspend fun quote(symbol: String, range: String): StockQuote = withContext(Dispatchers.IO) {
+private suspend fun quote(symbol: String, range: String, cache: MarketNewsCache): StockQuote = withContext(Dispatchers.IO) {
     val interval = if(range == "1d") "5m" else "1d"
-    parseStock(getHttps("https://query1.finance.yahoo.com/v8/finance/chart/${URLEncoder.encode(symbol,"UTF-8")}?range=$range&interval=$interval"), symbol)
+    parseStock(cache.get("https://query1.finance.yahoo.com/v8/finance/chart/${URLEncoder.encode(symbol,"UTF-8")}?range=$range&interval=$interval", ::getHttps), symbol)
 }
 
 @Composable internal fun FluidMarkets(state: FluidState, model: FluidModel, modifier: Modifier, settings: () -> Unit) {
+    val context = LocalContext.current.applicationContext
+    val cache = remember { MarketNewsCache(File(context.filesDir,"market-news")) }
     var range by remember { mutableStateOf("1d") }
     var stocks by remember { mutableStateOf(emptyList<StockQuote>()) }
     var news by remember { mutableStateOf(emptyList<Story>()) }
@@ -44,23 +48,24 @@ private suspend fun quote(symbol: String, range: String): StockQuote = withConte
     var stockError by remember { mutableStateOf<String?>(null) }
     var newsError by remember { mutableStateOf<String?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while(true) { delay(60_000); refresh++ } }
     LaunchedEffect(state.config.stockSymbols, range, refresh) {
-        stocks = emptyList(); loading = true; stockError = null
+        loading = true; stockError = null
         val symbols = state.config.stockSymbols.split(',').map { it.trim().uppercase() }.filter { it.isNotEmpty() }.distinct().take(8)
-        val results = coroutineScope { symbols.map { symbol -> async { try { quote(symbol, range) } catch(e: Exception) { if(e is CancellationException) throw e; null } } }.awaitAll() }
+        val results = coroutineScope { symbols.map { symbol -> async { try { quote(symbol, range, cache) } catch(e: Exception) { if(e is CancellationException) throw e; null } } }.awaitAll() }
         stocks = results.filterNotNull(); loading = false
         if(stocks.size < symbols.size) stockError = "Some quotes are unavailable. Check your symbols or retry."
     }
     LaunchedEffect(state.config.newsTopics, refresh) {
-        news = emptyList(); newsError = null
-        try { val batch = PublicNewsRepository().topStories(state.config.newsTopics); news = batch.stories; if(batch.failed.isNotEmpty()) newsError = "Some news topics could not update. Try refreshing." }
+        newsError = null
+        try { val batch = PublicNewsRepository { cache.get(it, ::getHttps) }.topStories(state.config.newsTopics); news = batch.stories; if(batch.failed.isNotEmpty()) newsError = "Some news topics could not update. Try refreshing." }
         catch(e: Exception) { if(e is CancellationException) throw e; newsError = "News unavailable. Check your connection." }
     }
     Column(modifier.verticalScroll(rememberScrollState()).padding(bottom=110.dp).testTag("fluid-markets"), verticalArrangement=Arrangement.spacedBy(16.dp)) {
         FluidHeading("Markets & news", "Your world, at a glance") { GlassIcon("settings", "Market & news settings", onClick=settings) }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             GlassButton(state.config.market, glyph="settings", onClick=settings)
-            GlassButton("Refresh") { refresh++ }
+            Text("Updates every 10 min",style=F.text(11,muted=true),modifier=Modifier.padding(vertical=14.dp))
         }
         Text("STOCK WATCH", style=F.text(11,true,muted=true))
         if(loading) Text("Updating quotes…", style=F.text(13,muted=true))

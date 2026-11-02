@@ -35,8 +35,8 @@
         <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/></intent>
         <intent><action android:name="android.media.action.STILL_IMAGE_CAMERA"/></intent>
     </queries>
-    <application android:allowBackup="false" android:label="cry" android:icon="@drawable/ic_cry" android:supportsRtl="true" android:theme="@style/Theme.Launcher" android:usesCleartextTraffic="false">
-        <service android:name=".data.MediaAccessService" android:label="cry media controls" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
+    <application android:allowBackup="false" android:label="Fluid Launcher" android:icon="@mipmap/ic_fluid" android:supportsRtl="true" android:theme="@style/Theme.Launcher" android:usesCleartextTraffic="false">
+        <service android:name=".data.MediaAccessService" android:label="Fluid Launcher media controls" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
         </service>
         <service android:name=".data.LauncherLockService" android:label="Double-tap lock" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
@@ -50,8 +50,8 @@
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>
-        <activity-alias android:name=".Setup" android:targetActivity=".MainActivity"
-            android:enabled="true" android:exported="true" android:label="cry" android:icon="@drawable/ic_cry">
+        <activity-alias android:name="${applicationId}.Setup" android:targetActivity=".MainActivity"
+            android:enabled="true" android:exported="true" android:label="Fluid Launcher" android:icon="@mipmap/ic_fluid">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

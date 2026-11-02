@@ -116,7 +116,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
         focus.clearFocus(); keyboard?.hide(); launchRect=rect; launching=app
         scope.launch { delay(170); model.launch(app); delay(260); launching=null; drawer=false; search=""; pager.scrollToPage(HOME_PAGE) }
     }
-    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0) { drawerGesture=null; widgetEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.scrollToPage(HOME_PAGE) } }
+    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0) { drawerGesture=null; widgetEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.9f,320f)) } }
     BackHandler {
         when { widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panel=null; drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
     }
@@ -172,7 +172,8 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Controls")
         pageNames.forEachIndexed { index,name ->
             val width by animateDpAsState(if(page==index) 15.dp else 5.dp,spring(.82f,400f),label="Page dot")
             Box(Modifier.width(28.dp).height(26.dp).clickable(role=Role.Tab){select(index)}.semantics { contentDescription=name; selected=page==index },contentAlignment=Alignment.Center) {
-                Box(Modifier.width(width).height(5.dp).clip(CircleShape).background(if(page==index) F.purple else F.muted.copy(alpha=.35f)))
+                if(index==HOME_PAGE) Glyph("home",if(page==index) F.purple else F.muted.copy(alpha=.35f),Modifier.size(12.dp))
+                else Box(Modifier.width(width).height(5.dp).clip(CircleShape).background(if(page==index) F.purple else F.muted.copy(alpha=.35f)))
             }
         }
     }

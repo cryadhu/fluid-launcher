@@ -39,15 +39,15 @@ internal fun getHttps(address: String): String {
     } finally { connection.disconnect() }
 }
 
-class PublicNewsRepository : NewsRepository {
+class PublicNewsRepository(private val fetch: (String) -> String = ::getHttps) : NewsRepository {
     override suspend fun topStories(categories: Set<NewsCategory>): NewsBatch = coroutineScope {
         val concurrency = Semaphore(3)
         val results = categories.sortedBy { it.ordinal }.map { category -> async(Dispatchers.IO) {
             concurrency.withPermit {
-                val stories = try { parseRss(getHttps(category.feedUrl), category.name) }
+                val stories = try { parseRss(fetch(category.feedUrl), category.name) }
                 catch (error: Exception) {
                     if (error is CancellationException) throw error
-                    if (category == NewsCategory.TECH) runCatching { parseHackerNews(getHttps("https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=8")) }.getOrDefault(emptyList()) else emptyList()
+                    if (category == NewsCategory.TECH) runCatching { parseHackerNews(fetch("https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=8")) }.getOrDefault(emptyList()) else emptyList()
                 }
                 category to stories.take(8)
             }

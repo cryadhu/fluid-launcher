@@ -19,7 +19,7 @@ import org.junit.Test
 class FluidLauncherTest {
     @get:Rule(order=0) val homeRole=object : org.junit.rules.ExternalResource() {
         override fun before() {
-            val fd=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("cmd role add-role-holder --user 0 android.app.role.HOME com.example.launcher")
+            val fd=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("cmd role add-role-holder --user 0 android.app.role.HOME com.cry.fluid")
             android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
         }
     }

@@ -385,3 +385,11 @@ Markets & News is now the first page, Home is second, followed by Your Space and
 Your Space has Work, Personal, and Tools tabs showing the apps assigned to each section. Assign apps through Organize spaces or the drawer long-press menu. Space widgets are saved independently of Home: long-press to resize or remove, and use Add widgets to bring them back. The calendar is no longer included by default in Your Space.
 
 Validation: 64 unit tests, release lint, signed release build, and an Android UI test covering Home return, all three mapped app tabs, and independent Space widget removal passed.
+
+### v1.1.6 — Fluid Launcher identity and persistent feeds
+
+The app is now named Fluid Launcher with application ID `com.cry.fluid` and the supplied adaptive icon, including its monochrome layer. This package installs separately from `com.example.launcher`; choose Fluid Launcher as the default Home app and grant its permissions again. Existing old-package settings are not transferred automatically.
+
+Home-button returns spring smoothly to Home, whose page marker is now a small house. Markets & News saves responses in app storage across restarts and checks the 10-minute refresh window while the page is active. Stock symbols/ranges and individual news sources have separate cache entries; unavailable sources keep their last successful data and wait 10 minutes before retrying. Changing to an uncached selection loads it immediately.
+
+Validation: 66 unit tests, Android navigation UI test, release lint, signed APK verification, and installation/HOME launch under the new package ID passed. The existing release key was reused.

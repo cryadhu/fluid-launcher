@@ -58,7 +58,7 @@ class LauncherPreferencesTest {
     }
     @Test fun soundCyclesThroughAllThreeModes() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.uiAutomation.executeShellCommand("cmd notification allow_dnd com.example.launcher").close()
+        instrumentation.uiAutomation.executeShellCommand("cmd notification allow_dnd com.cry.fluid").close()
         val audio = compose.activity.getSystemService(AudioManager::class.java)
         compose.runOnIdle { audio.ringerMode = AudioManager.RINGER_MODE_NORMAL; model.refreshDevice(); model.page(2) }
         try {
