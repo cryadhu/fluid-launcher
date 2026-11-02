@@ -14,13 +14,13 @@ class FluidConfigTest {
         assertEquals("Dawn",decodeFluid("""{"homeWallpaper":"Custom:../../secret.jpg"}""").homeWallpaper)
     }
     @Test fun dawnAndFourDockAppsAreDefaultsAndExplicitSelectionsPersist() {
-        assertEquals(listOf("Dawn","Original","Lavender"),wallpaperStyles)
+        assertEquals(listOf("Pastel Glass","Default","Dawn","Lavender"),wallpaperStyles)
         assertEquals("Dawn",FluidConfig().homeWallpaper)
         assertEquals(4,FluidConfig().dockCount)
         val migrated=decodeFluid("""{"homeWallpaper":"Original","dock":["@auto"],"dockCount":3}""")
-        assertEquals("Dawn",migrated.homeWallpaper)
+        assertEquals("Default",migrated.homeWallpaper)
         assertEquals(4,migrated.dockCount)
-        val chosen=FluidConfig(homeWallpaper="Original",dockCount=3)
+        val chosen=FluidConfig(homeWallpaper="Default",dockCount=3)
         assertEquals(chosen,decodeFluid(encodeFluid(chosen)))
     }
     @Test fun controlWidgetSelectionsPersistAndControlsPageIsGone() {
@@ -30,7 +30,7 @@ class FluidConfigTest {
         assertEquals(listOf("Markets","Home","Space"),pageNames)
     }
     @Test fun homeAndLockWallpapersPersistIndependently() {
-        val config=FluidConfig(homeWallpaper="Lavender",lockWallpaper="Original")
+        val config=FluidConfig(homeWallpaper="Lavender",lockWallpaper="Default",homeWallpaperBlur=true,lockWallpaperBlur=true)
         assertEquals(config,decodeFluid(encodeFluid(config)))
         assertEquals("Dawn",decodeFluid("{}").homeWallpaper)
         assertEquals("Dawn",decodeFluid("""{"homeWallpaper":"unknown","lockWallpaper":"bad"}""").lockWallpaper)

@@ -23,7 +23,7 @@ import androidx.core.view.WindowCompat
 import com.example.launcher.ui.Glyph
 import com.example.launcher.R
 
-data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Dawn", val wallpaperImage:ImageBitmap?=null)
+data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Dawn", val wallpaperImage:ImageBitmap?=null, val wallpaperBlur:Boolean=false)
 val LocalGlass = staticCompositionLocalOf { GlassScene() }
 object F {
     val purple = Color(0xFF8051FF)
@@ -59,10 +59,10 @@ object F {
     }
     SideEffect { activity?.let { WindowCompat.getInsetsController(it.window, view).apply { isAppearanceLightStatusBars = barAppearance.first; isAppearanceLightNavigationBars = barAppearance.second } } }
     var frosted by remember { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(dimensions, dark, config.homeWallpaper) {
-        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper,wallpaperImage=wallpaperImage)) }
+    LaunchedEffect(dimensions, dark, config.homeWallpaper, config.homeWallpaperBlur) {
+        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper,wallpaperImage=wallpaperImage,wallpaperBlur=config.homeWallpaperBlur)) }
     }
-    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted,config.homeWallpaper,wallpaperImage)) {
+    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted,config.homeWallpaper,wallpaperImage,config.homeWallpaperBlur)) {
         val colors = if (dark) darkColorScheme() else lightColorScheme()
         MaterialTheme(colorScheme = colors.copy(primary = F.purple, onPrimary = Color.White, background = if (dark) Color(0xFF201A34) else Color(0xFFE8E3F3),
             surface = if (dark) Color(0xFF312842) else Color(0xFFF3EFFC), onSurface = F.ink, onBackground = F.ink),
@@ -79,7 +79,7 @@ internal fun DrawScope.wallpaper(scene: GlassScene) = drawWallpaper(scene)
 private fun DrawScope.drawWallpaper(scene: GlassScene) {
     val w = scene.size.width; val h = scene.size.height
     val dark = scene.dark
-    if(scene.wallpaper=="Dawn" || isCustomWallpaper(scene.wallpaper)) {
+    if(scene.wallpaper=="Dawn" || scene.wallpaper=="Pastel Glass" || isCustomWallpaper(scene.wallpaper)) {
         val image=scene.wallpaperImage
         if(image!=null) {
             // Exclude the navigation pill baked into the supplied reference.
@@ -111,7 +111,7 @@ private fun DrawScope.drawWallpaper(scene: GlassScene) {
 }
 @Composable fun FluidWallpaper(modifier: Modifier = Modifier) {
     val scene = LocalGlass.current
-    Canvas(modifier.fillMaxSize()) { wallpaper(scene) }
+    Canvas(modifier.fillMaxSize().then(if(scene.wallpaperBlur) Modifier.blur(18.dp) else Modifier)) { wallpaper(scene) }
 }
 
 /** A static grain tile keeps acrylic texture stable during gestures and scrolling. */

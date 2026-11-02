@@ -455,3 +455,9 @@ Today at Work includes an inline task field and add button in the widget itself.
 The widget gallery now includes two music-orb choices: Music has a glass backing, while Music (open) leaves the orb unframed. Both have an animated circular album-art illustration, open progress ring, and play/pause control. The artwork rotates and makes a subtle circular orbit while music plays.
 
 Today at Work no longer opens its detail screen on a normal tap, keeping the inline task field and add button available directly in the widget.
+
+### v1.1.16 — Pastel Glass wallpapers and blur
+
+Wallpaper choices now begin with the supplied **Pastel Glass** image, followed by **Default** (the former Original artwork), Dawn and Lavender. Existing Original selections migrate to Default. Custom photo is the fifth, same-size tile in each picker rather than a separate full-width button.
+
+Home and lock-screen wallpaper sections each have their own Blur wallpaper switch. It updates the launcher background for Home and applies a downsampled, soft blurred version to the matching Android system or lock-screen wallpaper.
