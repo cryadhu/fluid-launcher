@@ -154,14 +154,16 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     }
 }
 
-@Composable internal fun WidgetEditSheet(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,close:()->Unit) {
+@Composable internal fun WidgetEditSheet(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,plan:Boolean=false,close:()->Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=.09f)).clickable(onClick=close).statusBarsPadding().navigationBarsPadding().padding(22.dp),contentAlignment=Alignment.BottomCenter) {
         Column(Modifier.fillMaxWidth().glass(32.dp,true).clickable{}.padding(22.dp).testTag("widget-edit"),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically){Text(kind.title,style=F.text(22,true),modifier=Modifier.weight(1f));GlassIcon("close","Close widget options",onClick=close)}
             Text("Widget size",style=F.text(12,muted=true))
             WidgetSizeOptions(state.config.sizes[kind] ?: "Standard") { model.resizeWidget(kind,it) }
-
-            GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){if(space)model.removeSpaceWidget(kind)else if(kind in state.config.widgets)model.toggleWidget(kind);close()}
+            val list=when{plan->state.config.planWidgets;space->state.config.spaceWidgets;else->state.config.widgets}
+            val index=list.indexOf(kind)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) { GlassButton("Move up",Modifier.weight(1f),glyph="up"){if(plan)model.movePlanWidget(kind,-1)else if(!space)model.moveWidget(kind,-1)};GlassButton("Move down",Modifier.weight(1f),glyph="next"){if(plan)model.movePlanWidget(kind,1)else if(!space)model.moveWidget(kind,1)} }
+            GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){if(plan)model.togglePlanWidget(kind)else if(space)model.removeSpaceWidget(kind)else if(kind in state.config.widgets)model.toggleWidget(kind);close()}
         }
     }
 }

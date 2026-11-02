@@ -141,6 +141,13 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                     "Wallpaper" -> { WallpaperSettings(state,model) }
                     "Dock" -> { DockSettings(state, model) }
                     "Market & news settings" -> { MarketNewsSettings(state, model) }
+                    "Pages" -> {
+                        Text("Markets & News and Home are fixed. You can manage the pages after Home.",style=F.text(12,muted=true))
+                        state.config.pages.forEachIndexed { index,page ->
+                            Row(Modifier.fillMaxWidth().glass(24.dp).padding(13.dp),verticalAlignment=Alignment.CenterVertically) { Text(page,style=F.text(14,true),modifier=Modifier.weight(1f));if(index>=2){GlassIcon("up","Move $page up",Modifier.size(32.dp)){model.movePage(page,-1)};GlassIcon("next","Move $page down",Modifier.size(32.dp)){model.movePage(page,1)};GlassIcon("close","Remove $page",Modifier.size(32.dp)){model.removePage(page)}} }
+                        }
+                        GlassButton("Add page",Modifier.fillMaxWidth(),primary=true,glyph="plus",onClick=model::addPage)
+                    }
                     "Settings" -> {
                         GlassButton("Market & news settings", glyph="settings") { navigate("Market & news settings") }
                         PanelCard("APPEARANCE"){
@@ -148,6 +155,8 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             Row(Modifier.fillMaxWidth().padding(top=18.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                                 listOf("Light","Dark","Auto").forEach{mode->GlassButton(mode,Modifier.weight(1f),primary=state.config.mode==mode){model.selectTheme(mode)}}
                             }
+                            Text("Accent color",style=F.text(12,muted=true),modifier=Modifier.padding(top=18.dp))
+                            Row(Modifier.fillMaxWidth().padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) { listOf("#8051FF","#2878E8","#0EAD92","#E35A8A","#E99827").forEach { color -> Box(Modifier.size(34.dp).clip(CircleShape).background(Color(android.graphics.Color.parseColor(color))).border(if(state.config.accent==color)2.dp else 0.dp,Color.White,CircleShape).clickable{model.configure{it.copy(accent=color)}}) } }
                         }
                         PanelCard("DOCK") {
                             OptionRow("app","Dock") { navigate("Dock") }
@@ -155,6 +164,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                         }
                         PanelCard("LAYOUT"){
                             SettingSwitch("App labels","Keep names under your apps",state.config.labels){value->model.configure{it.copy(labels=value)}}
+                            GlassButton("Pages",Modifier.padding(top=12.dp),glyph="app"){navigate("Pages")}
                             GlassButton("Arrange home widgets",Modifier.padding(top=12.dp),glyph="app"){navigate("Customize")}
                             GlassButton("Organize spaces",Modifier.padding(top=12.dp),glyph="files"){navigate("Spaces")}
                         }

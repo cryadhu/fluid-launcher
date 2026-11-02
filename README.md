@@ -477,3 +477,7 @@ The drawer’s former Suggested row is now Favorites. Long-press any app and sel
 ### v1.1.20 — Full-height app drawer
 
 The app drawer itself no longer sits in a rounded bottom sheet. It is a full-height wallpaper overlay with a compact search header and small pill-shaped All, Work, Play and Tools tabs matching the supplied reference.
+
+### v1.1.21 — Page, accent and widget controls
+
+Layout now includes Pages: add, move, and remove pages after the fixed Markets & News and Home pages. Appearance includes a global accent-color picker used by launcher buttons, tabs, and progress highlights. Long-press widgets to resize, move them up or down, or remove them; Plan’s widgets use the same controls and can now be removed.

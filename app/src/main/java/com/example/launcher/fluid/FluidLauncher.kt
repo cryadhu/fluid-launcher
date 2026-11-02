@@ -62,8 +62,9 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     val notices by FluidNotifications.items.collectAsStateWithLifecycle()
     val badges by NotificationBadges.packages.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val pager = rememberPagerState(initialPage=HOME_PAGE,pageCount = { pageNames.size })
+    val pager = rememberPagerState(initialPage=HOME_PAGE,pageCount = { state.config.pages.size })
     var widgetEditSpace by remember { mutableStateOf(false) }
+    var widgetEditPlan by remember { mutableStateOf(false) }
     var widgetEdit by remember { mutableStateOf<FluidWidget?>(null) }
     var dockDragging by remember { mutableStateOf(false) }
     var drawer by remember { mutableStateOf(false) }
@@ -127,7 +128,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEditSpace=pager.currentPage==SPACE_PAGE;widgetEdit=it }) {
+    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEditSpace=state.config.pages.getOrNull(pager.currentPage)=="Space";widgetEditPlan=state.config.pages.getOrNull(pager.currentPage)=="Plan";widgetEdit=it }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
@@ -136,15 +137,16 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                 val distance = ((pager.currentPage-index)+pager.currentPageOffsetFraction).absoluteValue.coerceAtMost(1f)
                 Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }) {
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
-                    when(index) {
-                        HOME_PAGE -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(SPACE_PAGE,animationSpec=spring(.9f,320f)) }},::launch)
-                        SPACE_PAGE -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
-                        PLAN_PAGE -> FluidPlan(state,model,padding,calendarAccess)
-                        0 -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
+                    when(state.config.pages[index]) {
+                        "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch)
+                        "Space" -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
+                        "Plan" -> FluidPlan(state,model,padding,calendarAccess)
+                        "Markets" -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
+                        else -> Column(padding,verticalArrangement=Arrangement.spacedBy(12.dp)){FluidHeading(state.config.pages[index],"A fresh page to make your own.");Text("Add widgets from Customize home.",style=F.text(13,muted=true))}
                     }
                 }
             }
-            if(drawerProgress<.99f) PageNavigation(pager.currentPage,1f-drawerProgress) { scope.launch { pager.animateScrollToPage(it,animationSpec=spring(.9f,320f)) } }
+            if(drawerProgress<.99f) PageNavigation(pager.currentPage,1f-drawerProgress,state.config.pages) { scope.launch { pager.animateScrollToPage(it,animationSpec=spring(.9f,320f)) } }
             if(drawerProgress>.001f) {
                 Box(Modifier.fillMaxSize().graphicsLayer { translationY=(1f-drawerProgress)*sceneSize.height; alpha=(drawerProgress*2).coerceAtMost(1f) }.statusBarsPadding().padding(top=8.dp).testTag("fluid-drawer-surface")) {
                     FluidDrawer(state,badges,search,{search=it},tab,{tab=it},searchFocused,drawerProgress>.98f,appMenu==null && panel==null,::launch,
@@ -163,7 +165,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
         AnimatedVisibility(appMenu!=null,enter=fadeIn(tween(110))+scaleIn(spring(.75f,450f),initialScale=.9f),exit=fadeOut(tween(100))+scaleOut(tween(130),targetScale=.96f)) {
             appMenu?.let { app -> FluidAppOptions(app,state,model,{appMenu=null}) }
         }
-        widgetEdit?.let { WidgetEditSheet(it,state,model,space=widgetEditSpace) { widgetEdit=null } }
+        widgetEdit?.let { WidgetEditSheet(it,state,model,space=widgetEditSpace,plan=widgetEditPlan) { widgetEdit=null } }
         launching?.let { AppLaunchBloom(it,launchRect,sceneSize) }
         AnimatedVisibility(state.message!=null,Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal=20.dp,vertical=68.dp),enter=fadeIn()+slideInVertically{it/2},exit=fadeOut()) {
             Text(state.message.orEmpty(),style=F.text(13),modifier=Modifier.glass(24.dp,true).padding(horizontal=20.dp,vertical=14.dp))
@@ -172,12 +174,12 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
 }
 }
 
-@Composable private fun BoxScope.PageNavigation(page: Int, opacity: Float, select: (Int)->Unit) {
+@Composable private fun BoxScope.PageNavigation(page: Int, opacity: Float, names:List<String>, select: (Int)->Unit) {
     Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom=3.dp).graphicsLayer { alpha=opacity }, horizontalArrangement=Arrangement.spacedBy(2.dp)) {
-        pageNames.forEachIndexed { index,name ->
+        names.forEachIndexed { index,name ->
             val width by animateDpAsState(if(page==index) 15.dp else 5.dp,spring(.82f,400f),label="Page dot")
             Box(Modifier.width(28.dp).height(26.dp).clickable(role=Role.Tab){select(index)}.semantics { contentDescription=name; selected=page==index },contentAlignment=Alignment.Center) {
-                if(index==HOME_PAGE) Glyph("home",if(page==index) F.purple else F.muted.copy(alpha=.35f),Modifier.size(12.dp))
+                if(name=="Home") Glyph("home",if(page==index) F.purple else F.muted.copy(alpha=.35f),Modifier.size(12.dp))
                 else Box(Modifier.width(width).height(5.dp).clip(CircleShape).background(if(page==index) F.purple else F.muted.copy(alpha=.35f)))
             }
         }

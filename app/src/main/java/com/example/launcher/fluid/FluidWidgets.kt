@@ -43,6 +43,7 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
     val rotation by motion.animateFloat(0f,360f,infiniteRepeatable(tween(18_000,easing=LinearEasing)),label="Record rotation")
     val orbit by motion.animateFloat(0f,360f,infiniteRepeatable(tween(7_500,easing=LinearEasing)),label="Artwork orbit")
     val active=state.device.playing
+    val accentColor=F.purple
     val artworkShift=if(active) 4.dp else 0.dp
     val container=if(framed) Modifier.glass(70.dp) else Modifier
     Column(modifier, horizontalAlignment=Alignment.CenterHorizontally) {
@@ -53,7 +54,7 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                 val accent = Stroke(2.2.dp.toPx(), cap=StrokeCap.Round)
                 listOf(-60f,120f).forEach { start ->
                     drawArc(Color.White.copy(alpha=.55f),start,120f,false,style=track)
-                    if(active) drawArc(F.purple,start,120f,false,style=accent)
+                    if(active) drawArc(accentColor,start,120f,false,style=accent)
                 }
             }
             val radians=Math.toRadians(orbit.toDouble())

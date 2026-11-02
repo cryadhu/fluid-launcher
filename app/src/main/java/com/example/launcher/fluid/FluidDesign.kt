@@ -23,10 +23,10 @@ import androidx.core.view.WindowCompat
 import com.example.launcher.ui.Glyph
 import com.example.launcher.R
 
-data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Dawn", val wallpaperImage:ImageBitmap?=null, val wallpaperBlur:Boolean=false)
+data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Dawn", val wallpaperImage:ImageBitmap?=null, val wallpaperBlur:Boolean=false, val accent:Color=Color(0xFF8051FF))
 val LocalGlass = staticCompositionLocalOf { GlassScene() }
 object F {
-    val purple = Color(0xFF8051FF)
+    val purple @Composable get() = LocalGlass.current.accent
     val lilac = Color(0xFFB99BFF)
     val ink @Composable get() = if (LocalGlass.current.dark) Color(0xFFF3F0FF) else Color(0xFF211B3D)
     val muted @Composable get() = if (LocalGlass.current.dark) Color(0xFFBCB5D6) else Color(0xFF68627D)
@@ -44,6 +44,7 @@ object F {
     val wallpaperContext=LocalContext.current
     val wallpaperImage=remember(config.homeWallpaper) { loadWallpaperImage(wallpaperContext,config.homeWallpaper) }
     val dark = config.mode == "Dark" || config.mode == "Auto" && isSystemInDarkTheme()
+    val accent=remember(config.accent){Color(android.graphics.Color.parseColor(config.accent))}
     var dimensions by remember { mutableStateOf(Size(1080f,2400f)) }
     val view = LocalView.current; val activity = LocalContext.current as? Activity
     val barAppearance=remember(config.homeWallpaper,wallpaperImage) {
@@ -60,9 +61,9 @@ object F {
     SideEffect { activity?.let { WindowCompat.getInsetsController(it.window, view).apply { isAppearanceLightStatusBars = barAppearance.first; isAppearanceLightNavigationBars = barAppearance.second } } }
     var frosted by remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(dimensions, dark, config.homeWallpaper, config.homeWallpaperBlur) {
-        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper,wallpaperImage=wallpaperImage,wallpaperBlur=config.homeWallpaperBlur)) }
+        frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper,wallpaperImage=wallpaperImage,wallpaperBlur=config.homeWallpaperBlur,accent=accent)) }
     }
-    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted,config.homeWallpaper,wallpaperImage,config.homeWallpaperBlur)) {
+    CompositionLocalProvider(LocalGlass provides GlassScene(dimensions, dark, frosted,config.homeWallpaper,wallpaperImage,config.homeWallpaperBlur,accent)) {
         val colors = if (dark) darkColorScheme() else lightColorScheme()
         MaterialTheme(colorScheme = colors.copy(primary = F.purple, onPrimary = Color.White, background = if (dark) Color(0xFF201A34) else Color(0xFFE8E3F3),
             surface = if (dark) Color(0xFF312842) else Color(0xFFF3EFFC), onSurface = F.ink, onBackground = F.ink),
