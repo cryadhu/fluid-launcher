@@ -427,3 +427,13 @@ The supplied Dawn image is the default Home background. Both wallpaper pickers n
 The automatic dock defaults to four app icons. Older automatic three-icon defaults migrate once, while new explicit choices and custom dock contents persist. Weather clouds use a shaded, multi-lobed silhouette with a rounded base and enough horizontal room for their drift animation. Notification shadows are enabled in the stacked and expanded views, with the clipping wrappers removed and room below the stack for the shadow.
 
 Validation: 70 unit tests, release lint, signed release build and three Android UI tests passed, including Dawn system wallpaper application and notification expand/collapse. Local emulator visual checks cover the new default background, four-app dock and notification shadow. This update remains local; no push is authorized.
+
+### v1.1.12 — Independent wallpapers, custom photos and device theme
+
+Wallpaper artwork and colors stay identical when changing theme. Dark mode changes foreground surfaces, with contrast adapted to the unmodified wallpaper. Status/navigation icon appearance follows the wallpaper brightness. Auto is the initial theme and follows Android's current device theme; existing installations migrate once to Auto, and subsequent explicit choices persist.
+
+Home and lock-screen wallpaper sections each offer a custom photo picker. The chosen image is decoded with bounded dimensions, copied into private app storage, applied to the corresponding Android wallpaper target, and retained across restarts without needing ongoing access to the original URI. Built-in wallpaper thumbnails remain independent of a selected custom photo.
+
+Selecting Light or Dark requests the system night mode through UiModeManager and verifies the result. If the device blocks the request, the app opens Display settings for the user to change it. Auto follows the device without changing its schedule. Android's [UiModeManagerService](https://android.googlesource.com/platform/frameworks/base/+/android16-release/services/core/java/com/android/server/UiModeManagerService.java) can restrict system theme changes on devices with night mode locked.
+
+Validation: 71 unit tests, two Android tests (custom import, pixel-identical wallpaper rendering across themes, and wallpaper application), release lint and signed APK verification passed. Direct system-theme changes were blocked on the Android emulator; the app's Display settings fallback was exercised. Auto was restored and the device returned to its original light mode.

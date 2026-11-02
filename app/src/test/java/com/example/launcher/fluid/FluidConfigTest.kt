@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FluidConfigTest {
+    @Test fun customWallpapersAndAutomaticThemePersistSafely() {
+        val custom="Custom:12345678-abcd-1234-abcd-123456789abc.jpg"
+        val config=FluidConfig(homeWallpaper=custom,lockWallpaper="Lavender",mode="Auto")
+        assertEquals(config,decodeFluid(encodeFluid(config)))
+        assertEquals("Auto",FluidConfig().mode)
+        assertEquals("Auto",decodeFluid("""{"mode":"Light"}""").mode)
+        assertFalse(validWallpaper("Custom:../../secret.jpg"))
+        assertEquals("Dawn",decodeFluid("""{"homeWallpaper":"Custom:../../secret.jpg"}""").homeWallpaper)
+    }
     @Test fun dawnAndFourDockAppsAreDefaultsAndExplicitSelectionsPersist() {
         assertEquals(listOf("Dawn","Original","Lavender"),wallpaperStyles)
         assertEquals("Dawn",FluidConfig().homeWallpaper)
@@ -29,7 +38,7 @@ class FluidConfigTest {
     @Test fun newDesignDefaultsAreIndependentOfLegacyPages() {
         val config = FluidConfig()
         assertEquals(listOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.NOTIFICATIONS,FluidWidget.AGENDA),config.widgets)
-        assertEquals("Light",config.mode)
+        assertEquals("Auto",config.mode)
         assertEquals(listOf("@auto"),config.dock)
         assertTrue(config.work.isEmpty())
     }
@@ -52,7 +61,7 @@ class FluidConfigTest {
         assertEquals(FluidConfig(),decodeFluid("broken json"))
         val decoded=decodeFluid("""{"widgets":["UNKNOWN","DATE","DATE"],"homeVersion":2,"mode":"invalid","dock":["a","a","b","c","d","e"]}""")
         assertEquals(listOf(FluidWidget.DATE),decoded.widgets)
-        assertEquals("Light",decoded.mode)
+        assertEquals("Auto",decoded.mode)
         assertEquals(listOf("a","b","c","d","e"),decoded.dock)
     }
     @Test fun oldHomeGetsNewHeaderAndNotificationsWhileSizesPersist() {

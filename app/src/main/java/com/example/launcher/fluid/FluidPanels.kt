@@ -139,7 +139,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                         PanelCard("APPEARANCE"){
                             Text("Soft light. Quiet dark.",style=F.text(18,true));Text("Every surface follows your theme.",style=F.text(12,muted=true),modifier=Modifier.padding(top=6.dp))
                             Row(Modifier.fillMaxWidth().padding(top=18.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                listOf("Light","Dark","Auto").forEach{mode->GlassButton(mode,Modifier.weight(1f),primary=state.config.mode==mode){model.configure{it.copy(mode=mode)}}}
+                                listOf("Light","Dark","Auto").forEach{mode->GlassButton(mode,Modifier.weight(1f),primary=state.config.mode==mode){model.selectTheme(mode)}}
                             }
                         }
                         PanelCard("DOCK") {

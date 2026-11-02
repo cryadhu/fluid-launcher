@@ -42,11 +42,22 @@ object F {
 
 @Composable fun FluidTheme(config: FluidConfig, content: @Composable () -> Unit) {
     val wallpaperContext=LocalContext.current
-    val wallpaperImage=remember { loadDawnWallpaper(wallpaperContext) }
+    val wallpaperImage=remember(config.homeWallpaper) { loadWallpaperImage(wallpaperContext,config.homeWallpaper) }
     val dark = config.mode == "Dark" || config.mode == "Auto" && isSystemInDarkTheme()
     var dimensions by remember { mutableStateOf(Size(1080f,2400f)) }
     val view = LocalView.current; val activity = LocalContext.current as? Activity
-    SideEffect { activity?.let { WindowCompat.getInsetsController(it.window, view).apply { isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark } } }
+    val barAppearance=remember(config.homeWallpaper,wallpaperImage) {
+        if(!isCustomWallpaper(config.homeWallpaper)) true to true else {
+            val bitmap=wallpaperImage.asAndroidBitmap()
+            fun lightAt(fraction:Float):Boolean {
+                val y=(bitmap.height*fraction).toInt().coerceIn(0,bitmap.height-1)
+                val luminance=(1..5).map { i -> androidx.core.graphics.ColorUtils.calculateLuminance(bitmap.getPixel((bitmap.width*i/6).coerceIn(0,bitmap.width-1),y)) }.average()
+                return luminance>.45
+            }
+            lightAt(.06f) to lightAt(.94f)
+        }
+    }
+    SideEffect { activity?.let { WindowCompat.getInsetsController(it.window, view).apply { isAppearanceLightStatusBars = barAppearance.first; isAppearanceLightNavigationBars = barAppearance.second } } }
     var frosted by remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(dimensions, dark, config.homeWallpaper) {
         frosted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { renderFrost(GlassScene(dimensions, dark, wallpaper=config.homeWallpaper,wallpaperImage=wallpaperImage)) }
@@ -63,14 +74,16 @@ object F {
 
 /** Analytic wallpaper shared by the root and frosted panes, sampled in window coordinates.
  * No screenshot readback, bitmap allocation per frame, or blur of foreground text. */
-internal fun DrawScope.wallpaper(scene: GlassScene) {
+internal fun DrawScope.wallpaper(scene: GlassScene) = drawWallpaper(scene.copy(dark=false))
+
+private fun DrawScope.drawWallpaper(scene: GlassScene) {
     val w = scene.size.width; val h = scene.size.height
     val dark = scene.dark
-    if(scene.wallpaper=="Dawn") {
+    if(scene.wallpaper=="Dawn" || isCustomWallpaper(scene.wallpaper)) {
         val image=scene.wallpaperImage
         if(image!=null) {
             // Exclude the navigation pill baked into the supplied reference.
-            val availableHeight=(image.height-48).coerceAtLeast(1)
+            val availableHeight=(image.height-if(scene.wallpaper=="Dawn")48 else 0).coerceAtLeast(1)
             val scale=maxOf(w/image.width,h/availableHeight)
             val sourceWidth=(w/scale).toInt().coerceIn(1,image.width)
             val sourceHeight=(h/scale).toInt().coerceIn(1,availableHeight)
@@ -118,7 +131,7 @@ fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Floa
         .shadow(if (!shadowed) 0.dp else if (elevated) 16.dp else 7.dp, shape, ambientColor = Color.Black.copy(alpha = .10f), spotColor = Color.Black.copy(alpha = .17f))
         .clip(shape).drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
-            val veil = if (scene.dark) Color(0xFF202126).copy(alpha = (.60f*strength).coerceAtMost(.88f)) else Color(0xFFF1F3F6).copy(alpha = (.42f*strength).coerceAtMost(.80f))
+            val veil = if (scene.dark) Color(0xFF202126).copy(alpha = (.76f*strength).coerceAtMost(.92f)) else Color(0xFFF1F3F6).copy(alpha = (.42f*strength).coerceAtMost(.80f))
             val grain = ShaderBrush(ImageShader(acrylicGrain,TileMode.Repeated,TileMode.Repeated))
             val highlight = Brush.verticalGradient(listOf(Color.White.copy(alpha = if(scene.dark).18f else .48f),Color.White.copy(alpha = if(scene.dark).06f else .14f)))
             onDrawBehind {

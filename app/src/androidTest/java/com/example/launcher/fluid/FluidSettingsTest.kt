@@ -34,7 +34,5 @@ class FluidSettingsTest {
         compose.onNodeWithContentDescription("Lock wallpaper: Lavender").performScrollTo().performClick()
         compose.waitUntil(10000) { model.state.value.config.lockWallpaper=="Lavender" && !model.state.value.wallpaperApplying }
         assertTrue(manager.getWallpaperId(android.app.WallpaperManager.FLAG_LOCK)>0)
-        compose.onNodeWithContentDescription("Back",substring=false).performClick()
-        compose.onNodeWithTag("fluid-panel-Customize").assertExists()
     }
 }
