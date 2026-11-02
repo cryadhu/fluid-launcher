@@ -473,3 +473,7 @@ The app drawer now uses a compact search and filter header, outlined All/Work/Pl
 ### v1.1.19 — Drawer favorites
 
 The drawer’s former Suggested row is now Favorites. Long-press any app and select Add to favorites; the selection persists and appears at the top of All. The long-press action menu is now a full-screen glass page rather than a centered sheet.
+
+### v1.1.20 — Full-height app drawer
+
+The app drawer itself no longer sits in a rounded bottom sheet. It is a full-height wallpaper overlay with a compact search header and small pill-shaped All, Work, Play and Tools tabs matching the supplied reference.
