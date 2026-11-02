@@ -354,3 +354,9 @@ Every notification in the home stack is composed with its actual content, so dra
 The targeted Fluid interaction suite covers disabled swipe-up, drag-to-bin removal without uninstalling, dock reordering and settings, original notification action delivery, fully composed notification cards and swipes in both directions. Android test dependencies use Espresso 3.7.0 and matching AndroidX Test libraries for Android 16 input support. The fixture grants the emulator Home role before activity launch to keep setup prompts out of interaction tests.
 
 Validation for 1.1.1: all 60 unit tests and all eight targeted Fluid interaction tests pass on the Android 16 emulator. Physical device and OEM notification destinations have not been visually verified.
+
+### Inline notification deck (1.1.2)
+
+Home notifications use a compact rounded glass stack with the app name and headline on the left and the app icon on the right. The count appears only in the section title, `Notification(x)`. See all unfolds the stack in place on Home and becomes Collapse. The expanded deck shows at most four full cards; remaining notifications stay rendered behind the fourth. Scroll vertically within the deck to bring later notifications forward while earlier cards cycle behind the stack; scroll back to revisit them. Horizontal swipes still dismiss clearable notifications and tapping a card still sends its original app action. The deck uses a fixed four-card viewport so large notification queues do not push the rest of Home indefinitely.
+
+Validation for 1.1.2: 61 unit tests and nine Fluid emulator interaction tests pass. The compact, expanded and one-step-scrolled notification layouts were visually inspected using captured test screenshots. Release lint, APK signing and ZIP alignment pass.

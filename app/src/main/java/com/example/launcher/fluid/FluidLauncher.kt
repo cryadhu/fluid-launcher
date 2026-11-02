@@ -106,7 +106,7 @@ private val pageNames = listOf("Home", "Space", "Markets", "Controls")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEdit=it },LocalNotificationsExpand provides { panel=null;hero.open(FluidWidget.NOTIFICATIONS) }) {
+    CompositionLocalProvider(LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEdit=it }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {

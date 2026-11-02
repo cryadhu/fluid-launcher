@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.first
 import java.time.*
 import kotlin.math.*
 
-val LocalNotificationsExpand = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
 internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
 
@@ -129,63 +128,5 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config
             Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) {listOf("Compact","Standard","Large").forEach{size->GlassButton(size,Modifier.weight(1f),primary=(state.config.sizes[kind] ?: "Standard")==size){model.resizeWidget(kind,size)}}}
             GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){if(kind in state.config.widgets)model.toggleWidget(kind);close()}
         }
-    }
-}
-
-@Composable internal fun NotificationStack(state:FluidState,model:FluidModel,detail:Boolean=false) {
-    val notifications by FluidNotifications.items.collectAsState()
-    val edit=LocalWidgetEdit.current
-    val expand=LocalNotificationsExpand.current
-    val size=state.config.sizes[FluidWidget.NOTIFICATIONS] ?: "Standard"
-    Column(Modifier.fillMaxWidth().animateContentSize(spring(1f,350f)).testTag("fluid-widget-NOTIFICATIONS")) {
-        Row(Modifier.fillMaxWidth().padding(horizontal=7.dp,vertical=5.dp),verticalAlignment=Alignment.CenterVertically) {
-            Text("Notifications",style=F.text(11,muted=true),modifier=Modifier.weight(1f).combinedClickable(onClick={},onLongClick={edit(FluidWidget.NOTIFICATIONS)}))
-            if(notifications.size>1)TextButton(onClick=expand){Text("See all",style=F.text(11,true),color=F.purple)}
-            if(notifications.any{it.clearable}) TextButton(onClick={FluidNotifications.clear()}){Text("Clear all",style=F.text(11,true),color=F.purple)}
-        }
-        if(notifications.isEmpty()) Column(Modifier.fillMaxWidth().glass(28.dp).combinedClickable(onClick={if(!state.device.mediaAccess)model.accessNotifications()},onLongClick={edit(FluidWidget.NOTIFICATIONS)}).padding(20.dp)) {
-            Text(if(state.device.mediaAccess)"All caught up"else"A clearer view of your day",style=F.text(15,true))
-            Text(if(state.device.mediaAccess)"New notifications will stack here."else"Connect notifications to show your live updates.",style=F.text(11,muted=true),modifier=Modifier.padding(top=7.dp))
-            if(!state.device.mediaAccess)GlassButton("Connect notifications",Modifier.padding(top=12.dp),onClick=model::accessNotifications)
-        } else if(detail) notifications.forEach { notice -> key(notice.key) { DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},size) } }
-        else {
-            val height=when(size){"Compact"->126.dp;"Large"->220.dp;else->164.dp}
-            Box(Modifier.fillMaxWidth().height(height+(notifications.size-1)*14.dp)) {
-                notifications.asReversed().forEach { notice -> key(notice.key) {
-                    val index=notifications.indexOf(notice)
-                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},size,
-                        Modifier.padding(horizontal=(index.coerceAtMost(3)*4).dp).offset(y=(index*14).dp).height(height))
-                } }
-            }
-            if(notifications.size>1)Text("${notifications.size} notifications",style=F.text(10,muted=true),modifier=Modifier.padding(start=8.dp))
-        }
-
-    }
-}
-
-@Composable private fun DismissibleNotification(notice:FluidNotification,model:FluidModel,hold:()->Unit,size:String,modifier:Modifier=Modifier) {
-    val scope=rememberCoroutineScope()
-    val offset=remember(notice.key){Animatable(0f)}
-    var width by remember{mutableFloatStateOf(1f)}
-    var dragging by remember{mutableStateOf(false)}
-    var total by remember{mutableFloatStateOf(0f)}
-    val latestHold by rememberUpdatedState(hold)
-    Column(modifier.fillMaxWidth().testTag("notification-card:${notice.key}").padding(bottom=if(modifier==Modifier)10.dp else 0.dp).onSizeChanged{width=it.width.toFloat()}.graphicsLayer{translationX=offset.value;rotationZ=offset.value/width*4f;alpha=1f-(abs(offset.value)/width).coerceIn(0f,.8f)}
-        .pointerInput(notice.key){detectHorizontalDragGestures(onDragStart={total=offset.value;dragging=true},onHorizontalDrag={change,delta->change.consume();total+=delta;scope.launch{offset.snapTo(total)}},onDragEnd={dragging=false;scope.launch{
-            if(abs(total)>width*.28f && notice.clearable){offset.animateTo(sign(total)*width*1.15f,tween(200));FluidNotifications.dismiss(notice.key)
-                val removed=withTimeoutOrNull(1500){FluidNotifications.items.first{list->list.none{it.key==notice.key}}}
-                if(removed==null)offset.animateTo(0f,spring(1f,350f))
-            }
-            else {offset.animateTo(0f,spring(.85f,420f));if(!notice.clearable && abs(total)>width*.28f)model.message("This ongoing notification cannot be cleared")}
-        }},onDragCancel={dragging=false;scope.launch{offset.animateTo(0f)}})}
-        .glass(28.dp,true).combinedClickable(onClick={model.openNotification(notice)},onLongClick={latestHold()}).padding(if(size=="Compact")16.dp else 20.dp)) {
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            if(notice.icon!=null)Image(notice.icon.asImageBitmap(),null,Modifier.size(29.dp).clip(RoundedCornerShape(9.dp)))
-            Text(notice.app,style=F.text(11,true),modifier=Modifier.weight(1f).padding(start=9.dp),maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text(fluidDate(notice.time,"HH:mm"),style=F.text(10,muted=true))
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(notice.title,style=F.text(if(size=="Compact")13 else 16,true),maxLines=2,overflow=TextOverflow.Ellipsis)
-        if(notice.text.isNotBlank())Text(notice.text,style=F.text(12,muted=true),maxLines=if(size=="Large")5 else if(size=="Compact")1 else 3,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=7.dp))
     }
 }
