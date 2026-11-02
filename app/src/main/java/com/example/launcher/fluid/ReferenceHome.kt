@@ -37,7 +37,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config
     Column(modifier.navigationBarsPadding().padding(bottom=32.dp).testTag("fluid-home")) {
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).combinedClickable(onClick={},onLongClick=customize).padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-                Text(fluidDate(state.now,"EEEE, MMM d"),style=F.text(12,muted=true))
+                Text(fluidDate(state.now,"EEEE, MMM d"),style=F.text(12,muted=true),modifier=Modifier.testTag("fluid-home-date"))
                 GlassIcon("edit","Customize home",Modifier.size(34.dp),onClick=customize)
             }
             val top=state.config.widgets.filter{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER}

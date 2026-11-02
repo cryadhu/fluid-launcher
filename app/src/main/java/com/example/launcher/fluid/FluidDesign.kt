@@ -76,12 +76,12 @@ internal fun DrawScope.wallpaper(scene: GlassScene) {
     Canvas(modifier.fillMaxSize()) { wallpaper(scene) }
 }
 
-fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Float = 1f): Modifier = composed {
+fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Float = 1f, shadowed: Boolean = true): Modifier = composed {
     val scene = LocalGlass.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     val shape = RoundedCornerShape(radius)
     this.onGloballyPositioned { val p = it.positionInWindow(); if (p != origin) origin = p }
-        .shadow(if (elevated) 18.dp else 6.dp, shape, ambientColor = Color(0xFF5D468B).copy(alpha = .12f), spotColor = Color(0xFF5D468B).copy(alpha = .12f))
+        .shadow(if (!shadowed) 0.dp else if (elevated) 18.dp else 6.dp, shape, ambientColor = Color(0xFF5D468B).copy(alpha = .12f), spotColor = Color(0xFF5D468B).copy(alpha = .12f))
         .clip(shape).drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
             val veil = if (scene.dark) Color(0xFF211B37).copy(alpha = .40f*strength) else Color.White.copy(alpha = .26f*strength)

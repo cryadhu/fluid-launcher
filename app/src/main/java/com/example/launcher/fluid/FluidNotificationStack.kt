@@ -25,38 +25,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.*
 
-/** Scrolled-off cards cycle behind the remaining deck, keeping every item composed. */
-internal fun notificationDeckOrder(count: Int, first: Int): List<Int> =
-    if(count<=0) emptyList() else List(count) { (first.coerceIn(0,count-1)+it)%count }
+internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String =
+    java.time.Instant.ofEpochMilli(time).atZone(zone).format(java.time.format.DateTimeFormatter.ofPattern("MMM, dd yyyy hh:mma",java.util.Locale.ENGLISH))
 
 @Composable internal fun NotificationStack(state: FluidState, model: FluidModel, detail: Boolean = false) {
     val notifications by FluidNotifications.items.collectAsState()
     val edit=LocalWidgetEdit.current
     var expanded by rememberSaveable { mutableStateOf(detail) }
-    var position by remember { mutableFloatStateOf(0f) }
     val size=state.config.sizes[FluidWidget.NOTIFICATIONS] ?: "Standard"
-    val compactHeight=when(size) { "Compact"->76.dp;"Large"->104.dp;else->88.dp }
-    val rowHeight=when(size) { "Compact"->94.dp;"Large"->120.dp;else->108.dp }
-    val density=LocalDensity.current
-    val stride=with(density) { rowHeight.toPx() }
-    val last=(notifications.size-1).coerceAtLeast(0).toFloat()
-    val currentPosition=position.coerceIn(0f,last)
-    val head=currentPosition.roundToInt()
-    val scroll=rememberScrollableState { delta ->
-        val previous=position.coerceIn(0f,last)
-        position=(previous-delta/stride).coerceIn(0f,last)
-        (previous-position)*stride
-    }
-    LaunchedEffect(notifications.size) {
-        position=position.coerceIn(0f,last)
-        if(notifications.isEmpty()) expanded=false
-    }
-    LaunchedEffect(scroll.isScrollInProgress,expanded) {
-        if(!scroll.isScrollInProgress) {
-            if(!expanded) position=0f
-            else animate(position,position.roundToInt().toFloat(),animationSpec=spring(1f,400f)) { value,_ -> position=value.coerceIn(0f,last) }
-        }
-    }
+    val compactHeight=when(size) { "Compact"->88.dp;"Large"->112.dp;else->96.dp }
+    LaunchedEffect(notifications.isEmpty()) { if(notifications.isEmpty()) expanded=false }
     Column(Modifier.fillMaxWidth().animateContentSize(spring(1f,350f)).testTag("fluid-widget-NOTIFICATIONS")) {
         Row(Modifier.fillMaxWidth().padding(horizontal=7.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
             Text("Notification(${notifications.size})",style=F.text(11,muted=true),modifier=Modifier.weight(1f)
@@ -72,32 +50,22 @@ internal fun notificationDeckOrder(count: Int, first: Int): List<Int> =
                 Text(if(state.device.mediaAccess) "New notifications will stack here." else "Connect notifications to show your live updates.",style=F.text(11,muted=true),modifier=Modifier.padding(top=7.dp))
                 if(!state.device.mediaAccess) GlassButton("Connect notifications",Modifier.padding(top=12.dp),onClick=model::accessNotifications)
             }
-        } else {
-            val tail=if(expanded) (notifications.size-4).coerceIn(0,3)*6.dp else (notifications.size-1).coerceIn(0,3)*7.dp
-            val height=if(expanded) min(notifications.size,4)*rowHeight+tail else compactHeight+tail
-            Box(Modifier.fillMaxWidth().height(height).clipToBounds()
-                .testTag(if(expanded) "notification-inline-expanded" else "notification-compact-stack")
-                .semantics {
-                    stateDescription=if(expanded) "First notification ${head+1} of ${notifications.size}" else "Compact notification stack"
-                    if(expanded) {
-                        verticalScrollAxisRange=ScrollAxisRange({currentPosition},{last})
-                        scrollBy { _,y -> position=(position+y/stride).coerceIn(0f,last);true }
-                    }
-                }.scrollable(scroll,Orientation.Vertical,enabled=expanded && notifications.size>1)) {
-                notificationDeckOrder(notifications.size,if(expanded) head else 0).withIndex().toList().asReversed().forEach { (relative,index) ->
-                    val notice=notifications[index]
-                    key(notice.key) {
-                        val behind=relative>=if(expanded) 4 else 1
-                        val depth=if(expanded) (relative-3).coerceIn(0,3) else relative.coerceAtMost(3)
-                        val targetY=if(expanded) relative.coerceAtMost(3)*rowHeight+depth*6.dp else depth*7.dp
-                        val y by animateDpAsState(targetY,spring(1f,400f),label="Notification deck position")
-                        val inset by animateDpAsState(if(expanded) depth*5.dp else depth*12.dp,spring(1f,400f),label="Notification deck inset")
-                        val cardHeight by animateDpAsState(if(expanded) rowHeight-4.dp else compactHeight,spring(1f,400f),label="Notification card height")
-                        DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},expanded,!behind,
-                            Modifier.padding(horizontal=inset).offset(y=y).height(cardHeight))
-                    }
-                }
+        } else if(expanded) {
+            Column(Modifier.fillMaxWidth().testTag("notification-inline-expanded"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                notifications.forEach { notice -> key(notice.key) {
+                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},true,true,
+                        Modifier.heightIn(min=108.dp))
+                } }
             }
+        } else {
+            val previews=notifications.take(3)
+            Box(Modifier.fillMaxWidth().height(compactHeight+(previews.size-1)*7.dp).clipToBounds().testTag("notification-compact-stack")) {
+                previews.withIndex().toList().asReversed().forEach { (index,notice) -> key(notice.key) {
+                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},false,index==0,
+                        Modifier.padding(horizontal=index*12.dp).offset(y=index*7.dp).height(compactHeight))
+                } }
+            }
+
         }
     }
 }
@@ -122,7 +90,7 @@ internal fun notificationDeckOrder(count: Int, first: Int): List<Int> =
     } else Modifier
     Row(modifier.fillMaxWidth().onSizeChanged { width=it.width.toFloat() }
         .graphicsLayer { translationX=offset.value;rotationZ=offset.value/width*3f;alpha=1f-(abs(offset.value)/width).coerceIn(0f,.8f) }
-        .then(drag).glass(28.dp,true)
+        .then(drag).glass(28.dp,elevated=expanded,shadowed=expanded)
         .combinedClickable(enabled=interactive,onClick={model.openNotification(notice)},onLongClick={latestHold()})
         .then(if(interactive) Modifier.testTag("notification-card:${notice.key}").semantics { stateDescription="Visible notification" }
             else Modifier.clearAndSetSemantics { testTag="notification-card:${notice.key}";stateDescription="Behind stack";invisibleToUser() })
@@ -131,10 +99,11 @@ internal fun notificationDeckOrder(count: Int, first: Int): List<Int> =
             Text(notice.app,style=F.text(11,muted=true),maxLines=1,overflow=TextOverflow.Ellipsis)
             Text(notice.title,style=F.text(14,true),maxLines=if(expanded) 2 else 1,overflow=TextOverflow.Ellipsis)
             if(expanded && notice.text.isNotBlank()) Text(notice.text,style=F.text(11,muted=true),maxLines=2,overflow=TextOverflow.Ellipsis)
+            Text(notificationTimestamp(notice.time),style=F.text(10,muted=true),maxLines=1,overflow=TextOverflow.Ellipsis)
         }
-        Box(Modifier.size(if(expanded) 46.dp else 48.dp).clip(RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center) {
+        Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).testTag("notification-icon:${notice.key}"),contentAlignment=Alignment.Center) {
             if(notice.icon!=null) Image(notice.icon.asImageBitmap(),null,Modifier.fillMaxSize())
-            else Box(Modifier.fillMaxSize().glass(14.dp),contentAlignment=Alignment.Center) { Glyph("app",F.purple,Modifier.size(25.dp)) }
+            else Box(Modifier.fillMaxSize().glass(10.dp,shadowed=expanded),contentAlignment=Alignment.Center) { Glyph("app",F.purple,Modifier.size(19.dp)) }
         }
     }
 }

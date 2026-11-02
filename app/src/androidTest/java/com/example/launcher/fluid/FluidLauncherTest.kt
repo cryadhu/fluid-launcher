@@ -4,6 +4,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -159,47 +160,45 @@ class FluidLauncherTest {
         } finally { pending.cancel();compose.activity.unregisterReceiver(receiver) }
 
     }
-    @Test fun notificationsExpandInlineWithFourCardsAndCycleOnScroll() {
+    @Test fun notificationsExpandAllAndScrollWithHome() {
+        val time=java.time.Instant.parse("2022-01-03T10:00:00Z").toEpochMilli()
         compose.runOnIdle {
             val model=androidx.lifecycle.ViewModelProvider(compose.activity)[FluidModel::class.java]
-            model.configure { it.copy(widgets=listOf(FluidWidget.NOTIFICATIONS)) }
-            FluidNotifications.mutable.value=(1..7).map { FluidNotification("inline-$it","App $it","Notification $it","Preview message $it",System.currentTimeMillis(),null,null,true) }
+            model.configure { it.copy(widgets=listOf(FluidWidget.NOTIFICATIONS,FluidWidget.AGENDA)) }
+            FluidNotifications.mutable.value=(1..7).map { FluidNotification("inline-$it","App $it","Notification $it","Preview message $it",time,null,null,true) }
             FluidNotifications.cancel={key -> FluidNotifications.mutable.value=FluidNotifications.mutable.value.filterNot { it.key==key } }
         }
+        val cards=SemanticsMatcher("Notification cards") { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)?.startsWith("notification-card:")==true }
         compose.onNodeWithText("Notification(7)").assertExists()
         compose.onNodeWithText("7 notifications").assertDoesNotExist()
         compose.onNodeWithTag("notification-compact-stack",useUnmergedTree=true).assertExists()
-        fun captureDeck(name: String) {
-            val bitmap=compose.onNodeWithTag("fluid-widget-NOTIFICATIONS",useUnmergedTree=true).captureToImage().asAndroidBitmap()
+        compose.onAllNodes(cards).assertCountEquals(3)
+        compose.onNodeWithTag("notification-icon:inline-1",useUnmergedTree=true).assertWidthIsEqualTo(32.dp)
+        compose.onNodeWithText(notificationTimestamp(time)).assertExists()
+        fun captureHome(name: String) {
+            val bitmap=compose.onNodeWithTag("fluid-home",useUnmergedTree=true).captureToImage().asAndroidBitmap()
             val temporary=java.io.File(compose.activity.filesDir,"$name.tmp")
             temporary.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
             check(temporary.renameTo(java.io.File(compose.activity.filesDir,"$name.png")))
         }
-        captureDeck("notification-compact")
+        captureHome("notification-compact")
         compose.onNodeWithText("See all").performClick()
         compose.onNodeWithTag("fluid-hero-overlay").assertDoesNotExist()
-        compose.onNodeWithTag("notification-inline-expanded",useUnmergedTree=true).assertIsDisplayed()
+        compose.onNodeWithTag("notification-inline-expanded",useUnmergedTree=true).assertExists()
         compose.onNodeWithText("Collapse").assertExists()
-        val visible=SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"Visible notification")
-        compose.onAllNodes(visible).assertCountEquals(4)
-        captureDeck("notification-expanded")
-        val step=108f*compose.activity.resources.displayMetrics.density
-        compose.onNodeWithTag("notification-inline-expanded",useUnmergedTree=true).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,step) }
-        compose.waitForIdle()
-        compose.onNodeWithTag("notification-inline-expanded",useUnmergedTree=true).assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"First notification 2 of 7"))
-        compose.onAllNodes(visible).assertCountEquals(4)
-        captureDeck("notification-scrolled")
-        compose.onNodeWithTag("notification-card:inline-1").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"Behind stack"))
-        compose.onNodeWithTag("notification-inline-expanded",useUnmergedTree=true).performTouchInput { swipeUp() }
-        compose.onNodeWithTag("notification-inline-expanded",useUnmergedTree=true).assert(SemanticsMatcher("Deck scroll advances the front card") {
-            it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.StateDescription)!="First notification 2 of 7"
-        })
-        compose.onNodeWithTag("notification-inline-expanded",useUnmergedTree=true).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,-10000f) }
-        compose.onNodeWithTag("notification-card:inline-1").assert(visible)
-        compose.onNodeWithText("Collapse").performClick()
+        compose.onAllNodes(cards).assertCountEquals(7)
+        compose.onAllNodesWithText(notificationTimestamp(time)).assertCountEquals(7)
+        compose.onNodeWithTag("fluid-home-date",useUnmergedTree=true).assertIsDisplayed()
+        captureHome("notification-expanded")
+        compose.onNodeWithTag("notification-card:inline-1").performTouchInput { swipeUp() }
+        compose.onNodeWithTag("fluid-home-date",useUnmergedTree=true).assertIsNotDisplayed()
+        compose.onNodeWithTag("notification-card:inline-7").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("fluid-widget-AGENDA",useUnmergedTree=true).performScrollTo().assertIsDisplayed()
+        captureHome("notification-scrolled")
+        compose.onNodeWithText("Collapse").performScrollTo().performClick()
         compose.onNodeWithTag("notification-compact-stack",useUnmergedTree=true).assertExists()
         compose.onNodeWithText("See all").assertExists()
-        compose.onAllNodes(visible).assertCountEquals(1)
+        compose.onAllNodes(cards).assertCountEquals(3)
     }
     @After fun clearFixtureNotifications() {
         FluidNotifications.mutable.value=emptyList();FluidNotifications.cancel=null

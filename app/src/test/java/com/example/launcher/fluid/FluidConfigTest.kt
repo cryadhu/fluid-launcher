@@ -52,12 +52,11 @@ class FluidConfigTest {
         assertEquals(3,decodeFluid("{}").dockCount)
         assertEquals(emptyList<String>(),decodeFluid(encodeFluid(custom.copy(dock=emptyList()))).dock)
     }
-    @Test fun notificationDeckCyclesEarlierCardsBehindTheWindow() {
-        assertEquals(listOf(0,1,2,3,4,5,6),notificationDeckOrder(7,0))
-        assertEquals(listOf(1,2,3,4,5,6,0),notificationDeckOrder(7,1))
-        assertEquals(listOf(6,0,1,2,3,4,5),notificationDeckOrder(7,6))
-        assertEquals(emptyList<Int>(),notificationDeckOrder(0,2))
-        assertEquals(listOf(0),notificationDeckOrder(1,4))
+    @Test fun notificationTimestampUsesRequestedDateAndTwelveHourTime() {
+        val time=java.time.Instant.parse("2022-01-03T10:00:00Z").toEpochMilli()
+        assertEquals("Jan, 03 2022 10:00AM",notificationTimestamp(time,java.time.ZoneId.of("UTC")))
+        assertEquals("Jan, 03 2022 03:30PM",notificationTimestamp(time,java.time.ZoneId.of("Asia/Kolkata")))
+        assertEquals("Jan, 03 2022 12:00AM",notificationTimestamp(time-10*60*60*1000,java.time.ZoneId.of("UTC")))
     }
     @Test fun frostPreservesSolidColorsAndSoftensEdges() {
         val solid=IntArray(16){0xFF8866CC.toInt()}
