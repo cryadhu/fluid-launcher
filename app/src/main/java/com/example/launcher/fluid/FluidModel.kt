@@ -21,8 +21,9 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Light", val labels: Boolean = true,
-    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 3, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true)
+    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 3, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true, val tools: Set<String> = emptySet(), val spaceWidgets: List<FluidWidget> = listOf(FluidWidget.TASKS))
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
+    put("tools",JSONArray(config.tools.toList()));put("spaceWidgets",JSONArray(config.spaceWidgets.map{it.name}))
     put("autoWeather",config.autoWeather)
     put("dockCount", config.dockCount); put("dockLabels", config.dockLabels); put("dockIconSize", config.dockIconSize); put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
@@ -36,7 +37,7 @@ fun decodeFluid(raw: String): FluidConfig = runCatching {
     val sizes = FluidWidget.entries.mapNotNull { kind -> j.optJSONObject("sizes")?.optString(kind.name)?.takeIf { it in listOf("Compact","Standard","Large") }?.let { kind to it } }.toMap()
     FluidConfig(widgets,
         j.optString("mode", "Light").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Light", j.optBoolean("labels", true),
-        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",3).coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true))
+        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",3).coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true),list("tools").toSet(),if(j.has("spaceWidgets"))list("spaceWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}.distinct()else listOf(FluidWidget.TASKS))
 }.getOrDefault(FluidConfig())
 
 data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<InstalledApp> = emptyList(), val loading: Boolean = true,
@@ -84,13 +85,15 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     fun resizeWidget(widget: FluidWidget, size: String) {
         if(size in listOf("Compact","Standard","Large")) configure { it.copy(sizes = it.sizes + (widget to size)) }
     }
+    fun toggleSpaceWidget(widget:FluidWidget)=configure { it.copy(spaceWidgets=if(widget in it.spaceWidgets)it.spaceWidgets-widget else it.spaceWidgets+widget) }
+    fun removeSpaceWidget(widget:FluidWidget)=configure { it.copy(spaceWidgets=it.spaceWidgets-widget) }
     fun moveWidget(widget: FluidWidget, delta: Int) = configure { c ->
         val list = c.widgets.toMutableList(); val from = list.indexOf(widget); val to = (from + delta).coerceIn(0, (list.size - 1).coerceAtLeast(0))
         if (from >= 0) { list.removeAt(from); list.add(to, widget) }; c.copy(widgets = list)
     }
     fun assign(app: InstalledApp, space: String) = configure { c ->
         val key = app.component.flattenToString()
-        c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key)
+        c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key, tools=if(space=="Tools")c.tools+key else c.tools-key)
     }
     fun removeDock(key: String) = configure { c -> c.copy(dock=fluidDock(mutable.value.apps,c.dock).take(if(c.dock==listOf("@auto")) c.dockCount else 6).map { it.component.flattenToString() } - key) }
     fun reorderDock(key: String, target: Int) = configure { c ->

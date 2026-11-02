@@ -377,3 +377,11 @@ Weather animations use the returned WMO code, is_day flag and wind_speed_10m in 
 Widget-size options keep labels centered and on one line. Narrow layouts and larger font scales use full-width stacked choices. Validation: 63 unit tests pass, release lint/build pass, and an Android UI test verifies single-line labels at 180% font scale in a 240dp-wide panel. The debug-only Compose test host is excluded from release builds.
 
 Release signing for v1.1.4 uses the existing local key in signing/cry-release.p12, as requested. Devices with APKs signed by the previous certificate require a reinstall; subsequent builds must reuse this existing key. Signing files remain excluded from Git.
+
+### v1.1.5 — Page order and Your Space
+
+Markets & News is now the first page, Home is second, followed by Your Space and Controls. Startup, the Home button, Back from a page, and app launch returns select Home.
+
+Your Space has Work, Personal, and Tools tabs showing the apps assigned to each section. Assign apps through Organize spaces or the drawer long-press menu. Space widgets are saved independently of Home: long-press to resize or remove, and use Add widgets to bring them back. The calendar is no longer included by default in Your Space.
+
+Validation: 64 unit tests, release lint, signed release build, and an Android UI test covering Home return, all three mapped app tabs, and independent Space widget removal passed.

@@ -33,7 +33,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     app.label.contains(query.trim(),true) && when(tab) {
         "Work" -> key in config.work
         "Personal" -> key in config.personal
-        "Tools" -> app.icon.glyph in setOf("settings","calculator","clock","files","calendar","scan","translate","weather","notes","tasks")
+        "Tools" -> key in config.tools
         else -> true
     }
 }
@@ -46,7 +46,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     var pullDistance by remember{mutableFloatStateOf(0f)}
     LaunchedEffect(ready,focusSearch,inputReady){if(ready && focusSearch && inputReady){requester.requestFocus();keyboard?.show()}}
     LaunchedEffect(query,tab){grid.scrollToItem(0)}
-    val filtered=remember(state.apps,state.config.work,state.config.personal,query,tab){fluidFilteredApps(state.apps,state.config,query,tab)}
+    val filtered=remember(state.apps,state.config.work,state.config.personal,state.config.tools,query,tab){fluidFilteredApps(state.apps,state.config,query,tab)}
     Column(Modifier.fillMaxSize().glass(36.dp,strength=1.12f).imePadding().testTag("fluid-app-drawer")) {
         Box(Modifier.fillMaxWidth().height(28.dp).clickable(onClick=close).pointerInput(Unit){detectVerticalDragGestures(onDragStart={pullDistance=0f},onVerticalDrag={change,y->change.consume();pullDistance=(pullDistance+y).coerceAtLeast(0f);pull(pullDistance)},onDragEnd={finishPull(pullDistance)},onDragCancel={finishPull(0f)})}.semantics { contentDescription="Close app drawer"; onClick {close();true} },contentAlignment=Alignment.Center){Box(Modifier.width(34.dp).height(4.dp).clip(CircleShape).background(F.muted.copy(alpha=.35f)))}
         Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -78,6 +78,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
             Spacer(Modifier.height(10.dp))
             OptionRow("files",if(key in state.config.work)"Remove from Work"else"Add to Work"){model.assign(app,if(key in state.config.work)"None"else"Work");dismiss()}
             OptionRow("contacts",if(key in state.config.personal)"Remove from Personal"else"Add to Personal"){model.assign(app,if(key in state.config.personal)"None"else"Personal");dismiss()}
+            OptionRow("settings",if(key in state.config.tools)"Remove from Tools"else"Add to Tools"){model.assign(app,if(key in state.config.tools)"None"else"Tools");dismiss()}
             val dock=fluidDock(state.apps,state.config.dock).take(if(state.config.dock==listOf("@auto")) state.config.dockCount else 6).map{it.component.flattenToString()}
             OptionRow("plus",if(key in dock)"Remove from dock"else"Add to dock"){
                 model.toggleDock(key);dismiss()
@@ -97,24 +98,35 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
 @Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit) {
     Box(Modifier.fillMaxSize().background(Color(0xFF40315E).copy(alpha=.08f)).statusBarsPadding().padding(top=10.dp)) {
         Column(Modifier.fillMaxSize().glass(36.dp,strength=1.15f).testTag("fluid-panel-$name")) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick={if(name=="Customize")close()else navigate("Customize")});Column(Modifier.weight(1f).padding(start=13.dp)){Text(name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Spaces"->"Apps that belong together";"Settings"->"Make it feel like you";else->"Your home, in your flow"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
+            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick={if(name=="Customize")close()else navigate("Customize")});Column(Modifier.weight(1f).padding(start=13.dp)){Text(name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Apps that belong together";"Settings"->"Make it feel like you";else->"Your home, in your flow"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                 when(name) {
-                    "Widgets" -> {
+                    "Widgets", "Space widgets" -> {
                         FluidWidget.entries.forEach { widget ->
                             Column(Modifier.fillMaxWidth().glass(28.dp).padding(18.dp)) {
-                                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(widget.title,style=F.text(17,true));Text(widget.subtitle,style=F.text(11,muted=true))};GlassButton(if(widget in state.config.widgets)"Remove"else"Add",primary=widget !in state.config.widgets){model.toggleWidget(widget)}}
+                                val enabled=widget in if(name=="Space widgets")state.config.spaceWidgets else state.config.widgets
+                                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(widget.title,style=F.text(17,true));Text(widget.subtitle,style=F.text(11,muted=true))};GlassButton(if(enabled)"Remove"else"Add",primary=!enabled){if(name=="Space widgets")model.toggleSpaceWidget(widget)else model.toggleWidget(widget)}}
                                 Spacer(Modifier.height(18.dp));WidgetBody(widget,state,model,calendarAccess=calendar,activityAccess=activity)
                             }
                         }
                     }
                     "Spaces" -> {
                         Text("Hold an app in the drawer for more options, or assign it here.",style=F.text(13,muted=true))
-                        state.apps.forEach{app->
+                        state.apps.forEach { app ->
                             val key=app.component.flattenToString()
-                            Row(Modifier.fillMaxWidth().glass(23.dp).padding(12.dp),verticalAlignment=Alignment.CenterVertically){if(app.artwork!=null)Image(app.artwork.asImageBitmap(),null,Modifier.size(36.dp));Text(app.label,style=F.text(12,true),modifier=Modifier.weight(1f).padding(horizontal=10.dp),maxLines=1,overflow=TextOverflow.Ellipsis)
-                                listOf("Work","Personal").forEach{space->val selected=key in if(space=="Work")state.config.work else state.config.personal
-                                    TextButton(onClick={model.assign(app,if(selected)"None"else space)}){Text(if(selected)"✓ $space"else space,style=F.text(10,true),color=if(selected)F.purple else F.muted)}
+                            Column(Modifier.fillMaxWidth().glass(23.dp).padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment=Alignment.CenterVertically) {
+                                    if(app.artwork!=null)Image(app.artwork.asImageBitmap(),null,Modifier.size(32.dp))
+                                    Text(app.label,style=F.text(13,true),modifier=Modifier.weight(1f).padding(start=10.dp),maxLines=1,overflow=TextOverflow.Ellipsis)
+                                }
+                                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                    listOf("Work","Personal","Tools").forEach { space ->
+                                        val selected=key in when(space){"Work"->state.config.work;"Personal"->state.config.personal;else->state.config.tools}
+                                        Box(Modifier.weight(1f).heightIn(min=42.dp).glass(18.dp).background(if(selected)F.purple.copy(alpha=.15f)else Color.Transparent)
+                                            .clickable(role=Role.RadioButton){model.assign(app,if(selected)"None"else space)}.semantics{this.selected=selected}.padding(vertical=10.dp),contentAlignment=Alignment.Center) {
+                                            Text(space,style=F.text(11,true),maxLines=1)
+                                        }
+                                    }
                                 }
                             }
                         }

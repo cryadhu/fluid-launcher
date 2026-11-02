@@ -11,6 +11,17 @@ class FluidConfigTest {
         assertEquals(listOf("@auto"),config.dock)
         assertTrue(config.work.isEmpty())
     }
+    @Test fun spaceWidgetsAndAllAppSectionsPersistIndependentlyOfHome() {
+        val defaults=FluidConfig()
+        assertFalse(FluidWidget.AGENDA in defaults.spaceWidgets)
+        val config=defaults.copy(tools=setOf("tools/Main"),work=setOf("work/Main"),personal=setOf("personal/Main"),spaceWidgets=emptyList())
+        val restored=decodeFluid(encodeFluid(config))
+        assertEquals(config,restored)
+        assertTrue(restored.spaceWidgets.isEmpty())
+        assertTrue(FluidWidget.AGENDA in restored.widgets)
+        assertEquals(listOf("Markets","Home","Space","Controls"),pageNames)
+        assertEquals(1,HOME_PAGE)
+    }
     @Test fun widgetOrderSpacesAndEmptyDockSurviveRestart() {
         val config=FluidConfig(widgets=listOf(FluidWidget.STORAGE,FluidWidget.WEATHER),mode="Dark",labels=false,city="Bengaluru",work=setOf("work/Main"),personal=setOf("personal/Main"),dock=emptyList())
         assertEquals(config,decodeFluid(encodeFluid(config)))

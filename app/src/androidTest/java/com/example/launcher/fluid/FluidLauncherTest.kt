@@ -25,7 +25,7 @@ class FluidLauncherTest {
     }
     @get:Rule(order=1) val compose=createAndroidComposeRule<MainActivity>()
     @Before fun resetWidgetLayout() {
-        compose.runOnIdle { androidx.lifecycle.ViewModelProvider(compose.activity)[FluidModel::class.java].configure { it.copy(widgets=FluidConfig().widgets,sizes=emptyMap(),dock=listOf("@auto"),dockCount=3,dockLabels=false,dockIconSize=48) } }
+        compose.runOnIdle { androidx.lifecycle.ViewModelProvider(compose.activity)[FluidModel::class.java].configure { it.copy(widgets=FluidConfig().widgets,sizes=emptyMap(),dock=listOf("@auto"),dockCount=3,dockLabels=false,dockIconSize=48,spaceWidgets=listOf(FluidWidget.TASKS)) } }
     }
     @Test fun homeDrawerKeyboardOptionsAndAllNewPagesWork() {
         compose.onNodeWithTag("fluid-home").assertExists()
