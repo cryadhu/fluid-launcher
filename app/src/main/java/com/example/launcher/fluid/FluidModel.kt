@@ -21,9 +21,9 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Light", val labels: Boolean = true,
-    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS))
+    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 3, val dockLabels: Boolean = false, val dockIconSize: Int = 48)
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
-    put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
+    put("dockCount", config.dockCount); put("dockLabels", config.dockLabels); put("dockIconSize", config.dockIconSize); put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
     put("work", JSONArray(config.work.toList())); put("personal", JSONArray(config.personal.toList())); put("dock", JSONArray(config.dock))
 }.toString()
@@ -35,7 +35,7 @@ fun decodeFluid(raw: String): FluidConfig = runCatching {
     val sizes = FluidWidget.entries.mapNotNull { kind -> j.optJSONObject("sizes")?.optString(kind.name)?.takeIf { it in listOf("Compact","Standard","Large") }?.let { kind to it } }.toMap()
     FluidConfig(widgets,
         j.optString("mode", "Light").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Light", j.optBoolean("labels", true),
-        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(4) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS))
+        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",3).coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56))
 }.getOrDefault(FluidConfig())
 
 data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<InstalledApp> = emptyList(), val loading: Boolean = true,
@@ -87,6 +87,28 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     fun assign(app: InstalledApp, space: String) = configure { c ->
         val key = app.component.flattenToString()
         c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key)
+    }
+    fun removeDock(key: String) = configure { c -> c.copy(dock=fluidDock(mutable.value.apps,c.dock).take(if(c.dock==listOf("@auto")) c.dockCount else 6).map { it.component.flattenToString() } - key) }
+    fun reorderDock(key: String, target: Int) = configure { c ->
+        val keys=fluidDock(mutable.value.apps,c.dock).take(if(c.dock==listOf("@auto")) c.dockCount else 6).map { it.component.flattenToString() }.toMutableList()
+        if(keys.remove(key)) keys.add(target.coerceIn(0,keys.size),key)
+        c.copy(dock=keys)
+    }
+    fun toggleDock(key: String) {
+        val c=mutable.value.config
+        val keys=fluidDock(mutable.value.apps,c.dock).take(if(c.dock==listOf("@auto")) c.dockCount else 6).map { it.component.flattenToString() }
+        if(key in keys) configure { it.copy(dock=keys-key) }
+        else if(keys.size < c.dockCount) configure { it.copy(dock=keys+key) }
+        else message("Dock is full. Increase icon count in Dock settings or remove an app.")
+    }
+    fun openNotification(notice: FluidNotification) {
+        val pending=notice.intent ?: run { message("This notification has no page to open"); return }
+        try {
+            val options=android.app.ActivityOptions.makeBasic()
+            if(android.os.Build.VERSION.SDK_INT>=34) options.setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+            pending.send(getApplication<Application>(),0,null,null,null,null,options.toBundle())
+        } catch (_: android.app.PendingIntent.CanceledException) { message("This notification has expired") }
+        catch (_: Exception) { message("Couldn't open this notification") }
     }
     fun launch(app: InstalledApp) = action { device.launch(app) }
     fun action(block: () -> Unit) { try { block() } catch (_: Exception) { message("This action isn't available on this device") } }

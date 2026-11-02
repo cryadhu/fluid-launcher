@@ -61,6 +61,7 @@ private val pageNames = listOf("Home", "Space", "Markets", "Controls")
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState(pageCount = { 4 })
     var widgetEdit by remember { mutableStateOf<FluidWidget?>(null) }
+    var dockDragging by remember { mutableStateOf(false) }
     var drawer by remember { mutableStateOf(false) }
     var drawerGesture by remember { mutableStateOf<Float?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
@@ -105,24 +106,17 @@ private val pageNames = listOf("Home", "Space", "Markets", "Controls")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    var swipe by remember { mutableFloatStateOf(0f) }
-    CompositionLocalProvider(LocalWidgetEdit provides { widgetEdit=it },LocalNotificationsExpand provides { panel=null;hero.open(FluidWidget.NOTIFICATIONS) }) {
+    CompositionLocalProvider(LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEdit=it },LocalNotificationsExpand provides { panel=null;hero.open(FluidWidget.NOTIFICATIONS) }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
             HorizontalPager(pager,Modifier.fillMaxSize().graphicsLayer { scaleX=1f-drawerProgress*.055f; scaleY=scaleX; alpha=1f-drawerProgress*.48f }.blur((drawerProgress*18).dp)
-                .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!drawer && panel==null && hero.kind==null) { index ->
+                .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null) { index ->
                 val distance = ((pager.currentPage-index)+pager.currentPageOffsetFraction).absoluteValue.coerceAtMost(1f)
-                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }
-                    .pointerInput(index) {
-                        detectVerticalDragGestures(onDragStart={swipe=0f},onVerticalDrag={change,amount ->
-                            swipe+=amount
-                            if(swipe < -18.dp.toPx()) { change.consume(); drawerGesture=(-swipe/sceneSize.height.coerceAtLeast(1)).coerceIn(0f,1f) }
-                        },onDragEnd={if(drawerGesture!=null){drawer=drawerGesture!!>.12f;drawerGesture=null;searchFocused=false;search=""};swipe=0f},onDragCancel={drawerGesture=null})
-                    }) {
+                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }) {
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
                     when(index) {
-                        0 -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(1,animationSpec=spring(.9f,320f)) }},{openDrawer(false)},::launch)
+                        0 -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(1,animationSpec=spring(.9f,320f)) }},::launch)
                         1 -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
                         2 -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
                         3 -> FluidControls(state,model,padding,torch,{showPanel("Settings")})
@@ -169,11 +163,11 @@ private val pageNames = listOf("Home", "Space", "Markets", "Controls")
 }
 
 internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<InstalledApp> {
-    if(keys != listOf("@auto")) return keys.mapNotNull { key -> apps.firstOrNull { it.component.flattenToString()==key } }.take(4)
+    if(keys != listOf("@auto")) return keys.mapNotNull { key -> apps.firstOrNull { it.component.flattenToString()==key } }.take(6)
     val groups = listOf(listOf("truecaller","dialer","contacts"),listOf("messaging","messages","mms"),listOf("chrome","browser"),listOf("camera"))
     val result=mutableListOf<InstalledApp>()
     groups.forEach { group -> group.firstNotNullOfOrNull { part -> apps.firstOrNull { it.component.packageName.contains(part,true) && it !in result } }?.let { result+=it } }
-    return (result+apps.filterNot { it in result }).take(4)
+    return (result+apps.filterNot { it in result }).take(6)
 }
 
 @Composable internal fun FluidAppTile(app:InstalledApp,badges:Set<String>,labels:Boolean,launch:(InstalledApp,Rect)->Unit,options:(InstalledApp)->Unit,modifier:Modifier=Modifier) {

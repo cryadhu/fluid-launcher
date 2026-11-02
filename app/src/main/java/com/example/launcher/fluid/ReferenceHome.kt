@@ -33,24 +33,9 @@ val LocalNotificationsExpand = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
 internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
 
-@Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,swipeOpen:()->Unit,launch:(InstalledApp,Rect)->Unit) {
+@Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit) {
     val edit=LocalWidgetEdit.current
-    Column(modifier.pointerInput(Unit) {
-        awaitEachGesture {
-            val down=awaitFirstDown(requireUnconsumed=false,pass=androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-            var up=false;var open=false
-            do {
-                val event=awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                val change=event.changes.firstOrNull{it.id==down.id} ?: break
-                val delta=change.position-down.position
-                if(abs(delta.x)>48.dp.toPx() && abs(delta.x)>abs(delta.y)) break
-                if(delta.y < -48.dp.toPx() && abs(delta.y)>abs(delta.x)*1.3f && change.uptimeMillis-down.uptimeMillis<600) open=true
-                if(open)change.consume()
-                up=!change.pressed
-            }while(!up)
-            if(open)swipeOpen()
-        }
-    }.navigationBarsPadding().padding(bottom=32.dp).testTag("fluid-home")) {
+    Column(modifier.navigationBarsPadding().padding(bottom=32.dp).testTag("fluid-home")) {
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).combinedClickable(onClick={},onLongClick=customize).padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
                 Text(fluidDate(state.now,"EEEE, MMM d"),style=F.text(12,muted=true))
@@ -69,17 +54,15 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config
                 }
             }
             state.config.widgets.filterNot{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER}.forEach{kind -> key(kind){
-                if(kind==FluidWidget.NOTIFICATIONS) NotificationStack(state,model)
+                if(kind==FluidWidget.NOTIFICATIONS) Box(Modifier.onGloballyPositioned { hero.bounds[kind]=it.boundsInRoot() }) { NotificationStack(state,model) }
                 else {
                     Text(if(kind==FluidWidget.AGENDA)"Today" else kind.title,style=F.text(11,muted=true),modifier=Modifier.padding(start=8.dp,top=2.dp))
                     ExpandableWidget(kind,state,model,hero,calendar,activity)
                 }
             } }
         }
-        Row(Modifier.fillMaxWidth().padding(top=10.dp,bottom=7.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
-            fluidDock(state.apps,state.config.dock).take(3).forEach{app -> FluidAppTile(app,badges,false,launch,{customize()},Modifier.width(62.dp))}
-            GlassIcon("app","All apps",onClick=ask)
-        }
+        FluidDock(state, model, badges, ask, launch)
+
     }
 }
 
@@ -164,20 +147,19 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config
             Text(if(state.device.mediaAccess)"All caught up"else"A clearer view of your day",style=F.text(15,true))
             Text(if(state.device.mediaAccess)"New notifications will stack here."else"Connect notifications to show your live updates.",style=F.text(11,muted=true),modifier=Modifier.padding(top=7.dp))
             if(!state.device.mediaAccess)GlassButton("Connect notifications",Modifier.padding(top=12.dp),onClick=model::accessNotifications)
-        } else if(detail) notifications.forEach{notice->DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},size)}
+        } else if(detail) notifications.forEach { notice -> key(notice.key) { DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},size) } }
         else {
             val height=when(size){"Compact"->126.dp;"Large"->220.dp;else->164.dp}
-            Box(Modifier.fillMaxWidth().height(height+24.dp)) {
-                val previews=notifications.take(3)
-                previews.drop(1).asReversed().forEachIndexed{_,notice->val index=previews.indexOf(notice)
-                    Box(Modifier.fillMaxWidth().padding(horizontal=(index*8).dp).offset(y=(index*10).dp).height(height).glass(28.dp).graphicsLayer{alpha=1f-index*.19f})
-                }
-                AnimatedContent(notifications.first().key,transitionSpec={(fadeIn(tween(240))+slideInVertically(spring(1f,350f)){it/8}) togetherWith fadeOut(tween(120))},label="Notification stack") { key ->
-                    notifications.firstOrNull{it.key==key}?.let{notice->DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},size,Modifier.height(height))}
-                }
+            Box(Modifier.fillMaxWidth().height(height+(notifications.size-1)*14.dp)) {
+                notifications.asReversed().forEach { notice -> key(notice.key) {
+                    val index=notifications.indexOf(notice)
+                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},size,
+                        Modifier.padding(horizontal=(index.coerceAtMost(3)*4).dp).offset(y=(index*14).dp).height(height))
+                } }
             }
             if(notifications.size>1)Text("${notifications.size} notifications",style=F.text(10,muted=true),modifier=Modifier.padding(start=8.dp))
         }
+
     }
 }
 
@@ -196,7 +178,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = when(config
             }
             else {offset.animateTo(0f,spring(.85f,420f));if(!notice.clearable && abs(total)>width*.28f)model.message("This ongoing notification cannot be cleared")}
         }},onDragCancel={dragging=false;scope.launch{offset.animateTo(0f)}})}
-        .glass(28.dp,true).combinedClickable(onClick={model.action{notice.intent?.send()}},onLongClick={latestHold()}).padding(if(size=="Compact")16.dp else 20.dp)) {
+        .glass(28.dp,true).combinedClickable(onClick={model.openNotification(notice)},onLongClick={latestHold()}).padding(if(size=="Compact")16.dp else 20.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             if(notice.icon!=null)Image(notice.icon.asImageBitmap(),null,Modifier.size(29.dp).clip(RoundedCornerShape(9.dp)))
             Text(notice.app,style=F.text(11,true),modifier=Modifier.weight(1f).padding(start=9.dp),maxLines=1,overflow=TextOverflow.Ellipsis)

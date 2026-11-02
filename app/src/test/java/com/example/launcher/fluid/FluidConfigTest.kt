@@ -20,7 +20,7 @@ class FluidConfigTest {
         val decoded=decodeFluid("""{"widgets":["UNKNOWN","DATE","DATE"],"homeVersion":2,"mode":"invalid","dock":["a","a","b","c","d","e"]}""")
         assertEquals(listOf(FluidWidget.DATE),decoded.widgets)
         assertEquals("Light",decoded.mode)
-        assertEquals(listOf("a","b","c","d"),decoded.dock)
+        assertEquals(listOf("a","b","c","d","e"),decoded.dock)
     }
     @Test fun oldHomeGetsNewHeaderAndNotificationsWhileSizesPersist() {
         val migrated=decodeFluid("""{"widgets":["TASKS"],"mode":"Dark"}""")
@@ -42,6 +42,15 @@ class FluidConfigTest {
         assertEquals(10.0,quote.change,0.001)
         assertEquals(listOf(100f,110f),quote.points)
         assertEquals(1000000L,quote.time)
+    }
+    @Test fun dockSettingsPersistAndClampCorruptValues() {
+        val custom=FluidConfig(dockCount=6,dockIconSize=40,dockLabels=true,dock=listOf("a","b","c","d","e","f"))
+        assertEquals(custom,decodeFluid(encodeFluid(custom)))
+        val bad=decodeFluid("""{"dockCount":100,"dockIconSize":-10}""")
+        assertEquals(6,bad.dockCount)
+        assertEquals(36,bad.dockIconSize)
+        assertEquals(3,decodeFluid("{}").dockCount)
+        assertEquals(emptyList<String>(),decodeFluid(encodeFluid(custom.copy(dock=emptyList()))).dock)
     }
     @Test fun frostPreservesSolidColorsAndSoftensEdges() {
         val solid=IntArray(16){0xFF8866CC.toInt()}

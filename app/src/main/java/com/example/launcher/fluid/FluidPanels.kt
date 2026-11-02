@@ -48,7 +48,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     LaunchedEffect(query,tab){grid.scrollToItem(0)}
     val filtered=remember(state.apps,state.config.work,state.config.personal,query,tab){fluidFilteredApps(state.apps,state.config,query,tab)}
     Column(Modifier.fillMaxSize().glass(36.dp,strength=1.12f).imePadding().testTag("fluid-app-drawer")) {
-        Box(Modifier.fillMaxWidth().height(28.dp).pointerInput(Unit){detectVerticalDragGestures(onDragStart={pullDistance=0f},onVerticalDrag={change,y->change.consume();pullDistance=(pullDistance+y).coerceAtLeast(0f);pull(pullDistance)},onDragEnd={finishPull(pullDistance)},onDragCancel={finishPull(0f)})}.semantics { contentDescription="Close app drawer"; onClick {close();true} },contentAlignment=Alignment.Center){Box(Modifier.width(34.dp).height(4.dp).clip(CircleShape).background(F.muted.copy(alpha=.35f)))}
+        Box(Modifier.fillMaxWidth().height(28.dp).clickable(onClick=close).pointerInput(Unit){detectVerticalDragGestures(onDragStart={pullDistance=0f},onVerticalDrag={change,y->change.consume();pullDistance=(pullDistance+y).coerceAtLeast(0f);pull(pullDistance)},onDragEnd={finishPull(pullDistance)},onDragCancel={finishPull(0f)})}.semantics { contentDescription="Close app drawer"; onClick {close();true} },contentAlignment=Alignment.Center){Box(Modifier.width(34.dp).height(4.dp).clip(CircleShape).background(F.muted.copy(alpha=.35f)))}
         Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             TextField(query,search,Modifier.weight(1f).heightIn(min=54.dp).glass(28.dp).focusProperties{canFocus=inputReady}.focusRequester(requester).testTag("fluid-app-search"),enabled=inputReady,singleLine=true,
                 placeholder={Text("Search apps",style=F.text(13,muted=true))},leadingIcon={Glyph("search",F.ink,Modifier.size(18.dp))},trailingIcon={if(query.isNotBlank())IconButton(onClick={search("")}){Glyph("close",F.muted,Modifier.size(17.dp))}},textStyle=F.text(),
@@ -78,9 +78,9 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
             Spacer(Modifier.height(10.dp))
             OptionRow("files",if(key in state.config.work)"Remove from Work"else"Add to Work"){model.assign(app,if(key in state.config.work)"None"else"Work");dismiss()}
             OptionRow("contacts",if(key in state.config.personal)"Remove from Personal"else"Add to Personal"){model.assign(app,if(key in state.config.personal)"None"else"Personal");dismiss()}
-            val dock=fluidDock(state.apps,state.config.dock).map{it.component.flattenToString()}
+            val dock=fluidDock(state.apps,state.config.dock).take(if(state.config.dock==listOf("@auto")) state.config.dockCount else 6).map{it.component.flattenToString()}
             OptionRow("plus",if(key in dock)"Remove from dock"else"Add to dock"){
-                if(key in dock)model.configure{it.copy(dock=dock-key)}else if(dock.size<4)model.configure{it.copy(dock=dock+key)}else model.message("The dock holds four apps. Remove one first.");dismiss()
+                model.toggleDock(key);dismiss()
             }
             OptionRow("settings","App info"){dismiss();model.open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:${app.component.packageName}")))}
             val context=LocalContext.current
@@ -119,6 +119,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             }
                         }
                     }
+                    "Dock" -> { DockSettings(state, model) }
                     "Market & news settings" -> { MarketNewsSettings(state, model) }
                     "Settings" -> {
                         GlassButton("Market & news settings", glyph="settings") { navigate("Market & news settings") }
@@ -127,6 +128,10 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             Row(Modifier.fillMaxWidth().padding(top=18.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                                 listOf("Light","Dark","Auto").forEach{mode->GlassButton(mode,Modifier.weight(1f),primary=state.config.mode==mode){model.configure{it.copy(mode=mode)}}}
                             }
+                        }
+                        PanelCard("DOCK") {
+                            OptionRow("app","Dock") { navigate("Dock") }
+                            Text("Icon count, size, names and favorite apps",style=F.text(12,muted=true))
                         }
                         PanelCard("LAYOUT"){
                             SettingSwitch("App labels","Keep names under your apps",state.config.labels){value->model.configure{it.copy(labels=value)}}
