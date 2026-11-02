@@ -437,3 +437,9 @@ Home and lock-screen wallpaper sections each offer a custom photo picker. The ch
 Selecting Light or Dark requests the system night mode through UiModeManager and verifies the result. If the device blocks the request, the app opens Display settings for the user to change it. Auto follows the device without changing its schedule. Android's [UiModeManagerService](https://android.googlesource.com/platform/frameworks/base/+/android16-release/services/core/java/com/android/server/UiModeManagerService.java) can restrict system theme changes on devices with night mode locked.
 
 Validation: 71 unit tests, two Android tests (custom import, pixel-identical wallpaper rendering across themes, and wallpaper application), release lint and signed APK verification passed. Direct system-theme changes were blocked on the Android emulator; the app's Display settings fallback was exercised. Auto was restored and the device returned to its original light mode.
+
+### v1.1.13 — Theme behavior restored
+
+Theme selection again changes the complete launcher palette, including the wallpaper treatment: Dark mode applies the intended dark veil to Dawn, Original, Lavender and custom-photo wallpapers. Custom wallpaper upload and the separate Home/lock selections remain available.
+
+Light, Dark and Auto now only control Fluid Launcher's own appearance. They no longer request a system-wide Android theme change or send the user to Android Display settings.

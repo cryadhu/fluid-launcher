@@ -89,11 +89,6 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     fun selectTheme(mode:String) {
         if(mode !in listOf("Light","Dark","Auto"))return
         configure { it.copy(mode=mode) }
-        if(mode=="Auto")return
-        val manager=getApplication<Application>().getSystemService(android.app.UiModeManager::class.java)
-        val requested=if(mode=="Dark")android.app.UiModeManager.MODE_NIGHT_YES else android.app.UiModeManager.MODE_NIGHT_NO
-        val changed=runCatching { manager.nightMode=requested; manager.nightMode==requested }.getOrDefault(false)
-        if(!changed) { message("Choose the matching phone theme in Display settings");open(Intent(Settings.ACTION_DISPLAY_SETTINGS)) }
     }
     fun importWallpaper(uri:android.net.Uri,lock:Boolean) {
         if(mutable.value.wallpaperApplying)return

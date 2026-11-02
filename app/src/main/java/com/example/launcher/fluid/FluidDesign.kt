@@ -74,7 +74,7 @@ object F {
 
 /** Analytic wallpaper shared by the root and frosted panes, sampled in window coordinates.
  * No screenshot readback, bitmap allocation per frame, or blur of foreground text. */
-internal fun DrawScope.wallpaper(scene: GlassScene) = drawWallpaper(scene.copy(dark=false))
+internal fun DrawScope.wallpaper(scene: GlassScene) = drawWallpaper(scene)
 
 private fun DrawScope.drawWallpaper(scene: GlassScene) {
     val w = scene.size.width; val h = scene.size.height

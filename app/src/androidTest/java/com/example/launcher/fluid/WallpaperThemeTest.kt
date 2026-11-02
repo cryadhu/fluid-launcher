@@ -11,7 +11,7 @@ import org.junit.Test
 import java.io.File
 
 class WallpaperThemeTest {
-    @Test fun importedPhotoPersistsAndAllWallpapersKeepTheirColorsAcrossThemes() {
+    @Test fun importedPhotoPersistsAndWallpapersRespondToTheme() {
         val context=ApplicationProvider.getApplicationContext<Context>()
         val input=File.createTempFile("wallpaper-import-",".png",context.cacheDir)
         var style:String?=null
@@ -31,7 +31,7 @@ class WallpaperThemeTest {
                 val a=IntArray(light.width*light.height);val b=IntArray(dark.width*dark.height)
                 light.getPixels(a,0,light.width,0,0,light.width,light.height)
                 dark.getPixels(b,0,dark.width,0,0,dark.width,dark.height)
-                assertArrayEquals("Wallpaper colors changed for $name",a,b)
+                assertFalse("Wallpaper did not respond to Dark theme for $name",a.contentEquals(b))
             }
         } finally {
             input.delete()
