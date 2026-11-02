@@ -461,3 +461,7 @@ Today at Work no longer opens its detail screen on a normal tap, keeping the inl
 Wallpaper choices now begin with the supplied **Pastel Glass** image, followed by **Default** (the former Original artwork), Dawn and Lavender. Existing Original selections migrate to Default. Custom photo is the fifth, same-size tile in each picker rather than a separate full-width button.
 
 Home and lock-screen wallpaper sections each have their own Blur wallpaper switch. It updates the launcher background for Home and applies a downsampled, soft blurred version to the matching Android system or lock-screen wallpaper.
+
+### v1.1.17 — Plan page
+
+Plan is a fourth page after Your Space. It brings together the day’s calendar, inline tasks, Quick Actions, and Favorites. Calendar widgets now launch the native calendar on tap rather than expanding. They load up to 30 events and show the first four by default, with See all / Collapse for longer schedules. Favorites uses the phone’s starred contacts after Contacts permission is granted.

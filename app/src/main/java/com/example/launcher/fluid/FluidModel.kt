@@ -17,7 +17,7 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
     BRIGHTNESS("Brightness", "Display brightness", "weather"), VOLUME("Volume", "Media volume", "music"),
     WIFI("Wi-Fi", "Internet controls", "wifi"), BLUETOOTH("Bluetooth", "Bluetooth controls", "bluetooth"), MOBILE_DATA("Mobile data", "Mobile connection", "mobile"), SOUND("Sound", "Normal, silent and vibrate", "silent"), FLASHLIGHT("Flashlight", "Quick light", "flashlight"), AIRPLANE("Airplane mode", "Flight mode controls", "airplane"),
     CLOCK("Clock", "Time in motion", "clock"), NOTIFICATIONS("Notifications", "Your day, stacked in glass", "silent"),
-    AGENDA("Agenda", "Your day, at a glance", "calendar"), MUSIC("Music", "Orb with glass background", "music"), MUSIC_OPEN("Music (open)", "Orb without background", "music"),
+    AGENDA("Agenda", "Your day, at a glance", "calendar"), QUICK_ACTIONS("Quick actions", "Useful tools at a touch", "app"), FAVORITES("Favorites", "Your starred contacts", "contacts"), MUSIC("Music", "Orb with glass background", "music"), MUSIC_OPEN("Music (open)", "Orb without background", "music"),
     WEATHER("Weather", "A window outside", "weather"), TASKS("Tasks", "Make room for focus", "tasks"),
     ACTIVITY("Activity", "Steps while the launcher is active", "health"), STORAGE("Storage", "Space for what matters", "files"), DATE("Date", "A moment in time", "calendar")
 }
@@ -183,6 +183,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         refreshDevice()
     }
     fun accessNotifications() = open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    fun dial(phone:String) = open(Intent(Intent.ACTION_DIAL,android.net.Uri.parse("tel:$phone")))
     fun toggle(name: String) {
         action { when (name) {
             "wifi", "mobile" -> device.open(Intent(if (android.os.Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_WIFI_SETTINGS))

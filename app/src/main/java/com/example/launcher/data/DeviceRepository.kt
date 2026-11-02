@@ -34,6 +34,7 @@ import java.text.Collator
 
 data class InstalledApp(val component: ComponentName, val label: String, val icon: AppIconStyle, val artwork: android.graphics.Bitmap? = null, val firstInstalledAt: Long = 0)
 data class AgendaEvent(val title: String, val times: String)
+data class FavoriteContact(val name:String,val phone:String)
 enum class ConnectivityType { WIFI, BLUETOOTH }
 data class PairedDevice(val name: String, val address: String)
 data class WifiNetwork(val ssid: String, val capabilities: String, val level: Int)
@@ -45,7 +46,7 @@ data class DeviceState(val wifi: Boolean = false, val bluetooth: Boolean? = null
     val wifiNetworks: List<WifiNetwork> = emptyList(), val wifiScanGranted: Boolean = false, val locationEnabled: Boolean = false,
     val soundMode: SoundMode = SoundMode.NORMAL, val mobileData: Boolean? = null, val mobileAvailable: Boolean = false,
     val nearbyBluetooth: List<PairedDevice> = emptyList(), val bluetoothScanning: Boolean = false,
-    val notificationsEnabled: Boolean = false, val airplaneMode: Boolean = false)
+    val notificationsEnabled: Boolean = false, val airplaneMode: Boolean = false, val favorites:List<FavoriteContact> = emptyList())
 
 class DeviceRepository(private val context: Context) {
     private val camera = context.getSystemService(CameraManager::class.java)
@@ -127,6 +128,7 @@ class DeviceRepository(private val context: Context) {
         val paired = if (bluetoothGranted) runCatching { bluetooth?.bondedDevices.orEmpty().map { PairedDevice(it.name ?: "Bluetooth device", it.address) }.sortedBy { it.name.lowercase() } }.getOrDefault(emptyList()) else emptyList()
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
         val calendar = if (granted) runCatching { calendar() } else Result.success(emptyList())
+        val contacts=if(ContextCompat.checkSelfPermission(context,Manifest.permission.READ_CONTACTS)==PackageManager.PERMISSION_GRANTED) runCatching { favorites() }.getOrDefault(emptyList()) else emptyList()
         val access = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
         val sessions = if (access) runCatching { media.getActiveSessions(listener) }.getOrDefault(emptyList()) else emptyList()
         val active = sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: sessions.firstOrNull()
@@ -151,7 +153,7 @@ class DeviceRepository(private val context: Context) {
             nearbyBluetooth = nearbyBluetooth.values.filter { candidate -> paired.none { it.address == candidate.address } }.sortedBy { it.name },
             bluetoothScanning = runCatching { bluetooth?.isDiscovering == true }.getOrDefault(false),
             notificationsEnabled = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled(),
-            airplaneMode = Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+            airplaneMode = Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0, favorites=contacts
         )
     }
     private fun calendar(): List<AgendaEvent> {
@@ -160,12 +162,18 @@ class DeviceRepository(private val context: Context) {
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also { ContentUris.appendId(it, now); ContentUris.appendId(it, end) }.build()
         val result = mutableListOf<AgendaEvent>()
         context.contentResolver.query(uri, arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY), "${CalendarContract.Instances.END} > ? AND ${CalendarContract.Instances.VISIBLE} = 1", arrayOf(now.toString()), "${CalendarContract.Instances.BEGIN} ASC")?.use { cursor ->
-            while (cursor.moveToNext() && result.size < 3) {
+            while (cursor.moveToNext() && result.size < 30) {
                 fun time(value: Long) = Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
                 result += AgendaEvent(cursor.getString(0) ?: "Untitled event", if (cursor.getInt(3) == 1) "All day" else "${time(cursor.getLong(1))} – ${time(cursor.getLong(2))}")
             }
         }
         return result
+    }
+    private fun favorites():List<FavoriteContact> {
+        val result=mutableListOf<FavoriteContact>()
+        context.contentResolver.query(android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),"${android.provider.ContactsContract.CommonDataKinds.Phone.STARRED} = 1",null,"${android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC")?.use { cursor ->
+            while(cursor.moveToNext() && result.size<4) { val name=cursor.getString(0).orEmpty();val phone=cursor.getString(1).orEmpty();if(name.isNotBlank()&&phone.isNotBlank()&&result.none{it.phone==phone})result+=FavoriteContact(name,phone) }
+        };return result
     }
     fun launch(app: InstalledApp) {
         if (app.component.packageName == "com.truecaller") { open(truecallerDialIntent()); return }

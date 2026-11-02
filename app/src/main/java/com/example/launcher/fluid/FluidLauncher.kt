@@ -42,7 +42,8 @@ import kotlin.math.*
 
 internal const val HOME_PAGE=1
 internal const val SPACE_PAGE=2
-internal val pageNames = listOf("Markets", "Home", "Space")
+internal const val PLAN_PAGE=3
+internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
 
 @Stable class FluidHero {
     var kind by mutableStateOf<FluidWidget?>(null)
@@ -82,6 +83,7 @@ internal val pageNames = listOf("Markets", "Home", "Space")
     val focus = LocalFocusManager.current
     val view = LocalView.current
     val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshDevice() }
+    val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshDevice() }
     val activityPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.startSteps() }
     val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshWeather(true) }
     val locateWeather:()->Unit={
@@ -97,6 +99,7 @@ internal val pageNames = listOf("Markets", "Home", "Space")
         }
     }
     val calendarAccess = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) }
+    val contactsAccess = { contactsPermission.launch(Manifest.permission.READ_CONTACTS) }
     val activityAccess = { if(Build.VERSION.SDK_INT >=29) activityPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION) else model.startSteps() }
     LaunchedEffect(appMenu, panel) {
         if(appMenu!=null || panel!=null) {
@@ -124,7 +127,7 @@ internal val pageNames = listOf("Markets", "Home", "Space")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEditSpace=pager.currentPage==SPACE_PAGE;widgetEdit=it }) {
+    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEditSpace=pager.currentPage==SPACE_PAGE;widgetEdit=it }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
@@ -136,6 +139,7 @@ internal val pageNames = listOf("Markets", "Home", "Space")
                     when(index) {
                         HOME_PAGE -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(SPACE_PAGE,animationSpec=spring(.9f,320f)) }},::launch)
                         SPACE_PAGE -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
+                        PLAN_PAGE -> FluidPlan(state,model,padding,calendarAccess)
                         0 -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
                     }
                 }
@@ -207,10 +211,10 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     val edit=LocalWidgetEdit.current
     val interaction=remember { MutableInteractionSource() }
     var source by remember { mutableStateOf(Rect.Zero) }
-    val opensDetail=kind!=FluidWidget.TASKS
+    val opensDetail=kind!=FluidWidget.TASKS && kind!=FluidWidget.AGENDA
     val surface=if(kind==FluidWidget.MUSIC_OPEN) Modifier else Modifier.glass(30.dp,true)
     Column(modifier.fillMaxWidth().onGloballyPositioned { source=Rect(it.positionInRoot(),it.size.toSize());hero.bounds[kind]=source }.graphicsLayer { alpha=if(hero.kind==kind) 0f else 1f }
-        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick={if(opensDetail)hero.open(kind,source)},onLongClick={edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
+        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick={if(kind==FluidWidget.AGENDA)model.open(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR))else if(opensDetail)hero.open(kind,source)},onLongClick={edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
         WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity,compact=state.config.sizes[kind]=="Compact")
     }
 }

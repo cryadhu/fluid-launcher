@@ -27,7 +27,7 @@ class FluidConfigTest {
         val controls=listOf(FluidWidget.BRIGHTNESS,FluidWidget.VOLUME)+tinyControls
         val config=FluidConfig(widgets=controls,spaceWidgets=controls.reversed())
         assertEquals(config,decodeFluid(encodeFluid(config)))
-        assertEquals(listOf("Markets","Home","Space"),pageNames)
+        assertEquals(listOf("Markets","Home","Space","Plan"),pageNames)
     }
     @Test fun homeAndLockWallpapersPersistIndependently() {
         val config=FluidConfig(homeWallpaper="Lavender",lockWallpaper="Default",homeWallpaperBlur=true,lockWallpaperBlur=true)
@@ -50,7 +50,7 @@ class FluidConfigTest {
         assertEquals(config,restored)
         assertTrue(restored.spaceWidgets.isEmpty())
         assertTrue(FluidWidget.AGENDA in restored.widgets)
-        assertEquals(listOf("Markets","Home","Space"),pageNames)
+        assertEquals(listOf("Markets","Home","Space","Plan"),pageNames)
         assertEquals(1,HOME_PAGE)
     }
     @Test fun widgetOrderSpacesAndEmptyDockSurviveRestart() {

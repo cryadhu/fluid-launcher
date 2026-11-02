@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.geometry.Offset
@@ -83,6 +84,7 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
         FluidWidget.NOTIFICATIONS -> NotificationStack(state,model,detail=detail)
 
         FluidWidget.AGENDA -> {
+            var expanded by rememberSaveable { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Text(fluidDate(state.now,"EEE, MMM d"),style=F.text(if(compact)16 else 21,true)); Text(if(state.device.calendarGranted) "${state.device.events.size} upcoming events" else "Your day, together",style=F.text(12,muted=true),modifier=Modifier.padding(top=3.dp)) }
                 Box(Modifier.size(34.dp).glass(50.dp),contentAlignment=Alignment.Center) { Glyph("calendar",F.purple,Modifier.size(17.dp)) }
@@ -95,15 +97,17 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                 Text(if(state.device.calendarError) "Calendar unavailable" else "A little breathing room.",style=F.text(14,true))
                 Text("Tap to open your calendar",style=F.text(12,muted=true),modifier=Modifier.padding(top=6.dp))
             } else Column(Modifier.glass(21.dp).padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                state.device.events.take(if(detail) 12 else if(compact) 1 else 2).forEachIndexed { index,event ->
+                state.device.events.take(if(expanded || detail) 30 else if(compact) 1 else 4).forEachIndexed { index,event ->
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.width(4.dp).height(28.dp).clip(CircleShape).background(if(index%2==0) F.purple else F.lilac))
                         Column { Text(event.title,style=F.text(13,true),maxLines=if(detail) 3 else 1,overflow=TextOverflow.Ellipsis); Text(event.times,style=F.text(11,muted=true)) }
                     }
                 }
+                if(state.device.events.size>4 && !compact) TextButton(onClick={expanded=!expanded},modifier=Modifier.align(Alignment.CenterHorizontally)) { Text(if(expanded)"Collapse" else "See all",style=F.text(11,true),color=F.purple) }
             }
-            if(detail) GlassButton("Open calendar",Modifier.padding(top=16.dp),glyph="calendar") { model.open(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR)) }
         }
+        FluidWidget.QUICK_ACTIONS -> QuickActions(state,model)
+        FluidWidget.FAVORITES -> FavoritesWidget(state,model)
         FluidWidget.WEATHER -> {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -179,6 +183,25 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                 Text(fluidDate(state.now,"EEE"),style=F.text(13)); Text(fluidDate(state.now,"d"),style=F.text(if(detail) 96 else if(compact)32 else 44,true)); Text(fluidDate(state.now,"MMMM yyyy"),style=F.text(12,muted=true))
             }
         }
+    }
+}
+
+@Composable internal fun QuickActions(state:FluidState,model:FluidModel) {
+    val actions=listOf("Scan" to "scan","Translate" to "translate","Timer" to "clock","Note" to "notes")
+    Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Text("Quick actions",style=F.text(15,true))
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly) { actions.forEach { (title,glyph) -> Column(horizontalAlignment=Alignment.CenterHorizontally) { GlassIcon(glyph,title,Modifier.size(46.dp)){ when(title) { "Scan"->model.open(android.content.Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)); "Timer"->model.open(android.content.Intent(android.provider.AlarmClock.ACTION_SET_TIMER)); "Translate"->model.open(android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse("https://translate.google.com"))); else->model.open(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")) } };Text(title,style=F.text(9),modifier=Modifier.padding(top=5.dp)) } }
+        }
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf(FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidget.SOUND,FluidWidget.FLASHLIGHT).forEach { kind -> TinyControl(kind,state,model,Modifier.weight(1f)) } }
+    }
+}
+
+@Composable internal fun FavoritesWidget(state:FluidState,model:FluidModel) {
+    val request=LocalContactsAccess.current
+    Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        Text("Favorites",style=F.text(15,true))
+        if(state.device.favorites.isEmpty()) { Text("Choose access to show your starred contacts.",style=F.text(12,muted=true));GlassButton("Connect contacts",glyph="contacts",onClick=request) }
+        else Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly) { state.device.favorites.forEach { person -> Column(Modifier.clickable{model.dial(person.phone)},horizontalAlignment=Alignment.CenterHorizontally) { Box(Modifier.size(44.dp).glass(50.dp),contentAlignment=Alignment.Center){Text(person.name.take(1).uppercase(),style=F.text(15,true),color=F.purple)};Text(person.name,style=F.text(10),maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=5.dp).widthIn(max=66.dp)) } } }
     }
 }
 
