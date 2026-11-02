@@ -20,7 +20,7 @@ internal fun renderFrost(scene: GlassScene): ImageBitmap {
     }
     val pixels = IntArray(width * height)
     bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-    repeat(3) { blurPass(pixels, width, height, 7) }
+    repeat(3) { blurPass(pixels, width, height, 11) }
     bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
     return bitmap.asImageBitmap()
 }

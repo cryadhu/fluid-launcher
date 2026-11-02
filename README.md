@@ -411,3 +411,11 @@ Removed the Controls page; the page order is Markets, Home, Your Space. Add Brig
 The refresh glyph now uses a clean pair of circular arrows. Stock range changes keep the existing chart and card layout, with a small loader in each quote header rather than an extra loading text row. Notification expansion and collapse keep the same cards mounted while animating their position, width, height and stack spacing.
 
 Validation: 69 unit tests, release lint, signed release build and two Android UI tests passed, including control widget removal and intermediate card positions during notification expansion/collapse.
+
+### v1.1.10 — Local acrylic material preview
+
+Shared surfaces now use a Windows Start menu-inspired acrylic finish: stronger cached backdrop blur, a neutral translucent light/dark tint, stable fine grain, subtle hairline borders and restrained neutral shadows. The treatment follows the blur/tint/noise approach described in [Microsoft's Acrylic material guidance](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic). It avoids the directional gloss and raised bevels of the rejected preview. Foreground icons and text remain sharp.
+
+Keep this styling preview local for review; no push is authorized for this update.
+
+Validation: 69 unit tests, release lint, signed APK verification and emulator visual checks in Light and Dark passed. No push was performed.

@@ -85,26 +85,38 @@ internal fun DrawScope.wallpaper(scene: GlassScene) {
     Canvas(modifier.fillMaxSize()) { wallpaper(scene) }
 }
 
+/** A static grain tile keeps acrylic texture stable during gestures and scrolling. */
+private val acrylicGrain: ImageBitmap by lazy {
+    val random=java.util.Random(41)
+    val pixels=IntArray(64*64) {
+        val shade=if(random.nextBoolean())0xFFFFFF else 0x000000
+        ((1+random.nextInt(3)) shl 24) or shade
+    }
+    android.graphics.Bitmap.createBitmap(pixels,64,64,android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+}
+
 fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Float = 1f, shadowed: Boolean = true): Modifier = composed {
     val scene = LocalGlass.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     val shape = RoundedCornerShape(radius)
     this.onGloballyPositioned { val p = it.positionInWindow(); if (p != origin) origin = p }
-        .shadow(if (!shadowed) 0.dp else if (elevated) 18.dp else 6.dp, shape, ambientColor = Color(0xFF5D468B).copy(alpha = .12f), spotColor = Color(0xFF5D468B).copy(alpha = .12f))
+        .shadow(if (!shadowed) 0.dp else if (elevated) 16.dp else 7.dp, shape, ambientColor = Color.Black.copy(alpha = .10f), spotColor = Color.Black.copy(alpha = .17f))
         .clip(shape).drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
-            val veil = if (scene.dark) Color(0xFF211B37).copy(alpha = .40f*strength) else Color.White.copy(alpha = .26f*strength)
-            val highlight = Brush.linearGradient(listOf(Color.White.copy(alpha = if (scene.dark) .24f else .85f), Color.White.copy(alpha = .08f), Color.White.copy(alpha = .42f)))
+            val veil = if (scene.dark) Color(0xFF202126).copy(alpha = (.60f*strength).coerceAtMost(.88f)) else Color(0xFFF1F3F6).copy(alpha = (.42f*strength).coerceAtMost(.80f))
+            val grain = ShaderBrush(ImageShader(acrylicGrain,TileMode.Repeated,TileMode.Repeated))
+            val highlight = Brush.verticalGradient(listOf(Color.White.copy(alpha = if(scene.dark).18f else .48f),Color.White.copy(alpha = if(scene.dark).06f else .14f)))
             onDrawBehind {
-                // A cached, blurred wallpaper sample refracts beneath crisp foreground content.
-                translate(-origin.x + 1.dp.toPx(), -origin.y + 2.dp.toPx()) {
+                // Acrylic: aligned backdrop blur, neutral tint, fine noise, then a hairline edge.
+                translate(-origin.x, -origin.y) {
                     val frost = scene.frost
                     if (frost == null) wallpaper(scene)
                     else drawImage(frost, dstSize = IntSize(scene.size.width.toInt(), scene.size.height.toInt()), filterQuality = FilterQuality.Medium)
                 }
                 drawRect(veil)
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (scene.dark) .06f else .15f), Color.Transparent)))
-                drawOutline(outline, highlight, style = Stroke(1.dp.toPx()))
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (scene.dark) .025f else .055f), Color.Transparent)))
+                drawRect(grain)
+                drawOutline(outline, highlight, style = Stroke(.65.dp.toPx()))
             }
         }
 }
