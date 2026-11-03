@@ -103,9 +103,10 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
 }
 
 @Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit,back:()->Unit) {
+    val customizePage=name.removePrefix("Customize:").takeIf { name.startsWith("Customize:") } ?: "Home"
     Box(Modifier.fillMaxSize().background(Color(0xFF40315E).copy(alpha=.08f)).statusBarsPadding().padding(top=10.dp)) {
         Column(Modifier.fillMaxSize().glass(36.dp,strength=1.15f).testTag("fluid-panel-$name")) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=back);Column(Modifier.weight(1f).padding(start=13.dp)){Text(name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Apps that belong together";"Settings"->"Make it feel like you";else->"Your home, in your flow"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
+            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=back);Column(Modifier.weight(1f).padding(start=13.dp)){Text(if(name.startsWith("Customize:"))"Customize $customizePage" else name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Apps that belong together";"Settings"->"Make it feel like you";else->"Widgets and layout for this page"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                 when(name) {
                     "Widgets", "Space widgets" -> {
@@ -176,10 +177,20 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                         }
                     }
                     else -> {
+                        if(name.startsWith("Widgets:")) {
+                            val page=name.removePrefix("Widgets:")
+                            FluidWidget.entries.forEach { widget ->
+                                val enabled=widget in model.widgetsForPage(page)
+                                Column(Modifier.fillMaxWidth().glass(28.dp).padding(18.dp)) {
+                                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(widget.title,style=F.text(17,true));Text(widget.subtitle,style=F.text(11,muted=true))};GlassButton(if(enabled)"Remove"else"Add",primary=!enabled){model.toggleWidgetForPage(page,widget)}}
+                                    Spacer(Modifier.height(18.dp));WidgetBody(widget,state,model,calendarAccess=calendar,activityAccess=activity)
+                                }
+                            }
+                        } else {
                         PanelCard("MAKE ROOM FOR YOU") {
                             Text("A softer kind of home.",style=F.text(22,true));Text("Add a widget, set the mood, find your space.",style=F.text(13,muted=true),modifier=Modifier.padding(top=8.dp))
                             Row(Modifier.fillMaxWidth().padding(top=22.dp),horizontalArrangement=Arrangement.SpaceEvenly){
-                                Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("app","Widget gallery",primary=true){navigate("Widgets")};Text("Widgets",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
+                                Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("app","Widget gallery",primary=true){navigate("Widgets:$customizePage")};Text("Widgets",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
                                 Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("weather","Appearance"){navigate("Settings")};Text("Theme",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
                                 Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("image","Wallpaper"){navigate("Wallpaper")};Text("Wallpaper",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
                                 Column(horizontalAlignment=Alignment.CenterHorizontally){GlassIcon("files","Organize spaces"){navigate("Spaces")};Text("Spaces",style=F.text(11),modifier=Modifier.padding(top=8.dp))}
@@ -187,11 +198,13 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             }
                         }
                         Text("ON YOUR HOME",style=F.text(11,true,muted=true),modifier=Modifier.padding(start=4.dp))
-                        if(state.config.widgets.isEmpty())Text("A little breathing room. Add a widget whenever you're ready.",style=F.text(13,muted=true))
-                        state.config.widgets.forEachIndexed { index,kind ->
-                            Row(Modifier.fillMaxWidth().glass(24.dp).padding(12.dp),verticalAlignment=Alignment.CenterVertically){Glyph(kind.glyph,F.purple,Modifier.size(23.dp));Column(Modifier.weight(1f).padding(start=14.dp)){Text(kind.title,style=F.text(14,true));Text(kind.subtitle,style=F.text(10,muted=true))};if(index>0)GlassIcon("up","Move ${kind.title} up",Modifier.size(32.dp)){model.moveWidget(kind,-1)};if(index<state.config.widgets.lastIndex)GlassIcon("next","Move ${kind.title} down",Modifier.size(32.dp)){model.moveWidget(kind,1)};GlassIcon("close","Remove ${kind.title}",Modifier.size(32.dp)){model.toggleWidget(kind)}}
+                        val currentWidgets=model.widgetsForPage(customizePage)
+                        if(currentWidgets.isEmpty())Text("A little breathing room. Add a widget whenever you're ready.",style=F.text(13,muted=true))
+                        currentWidgets.forEach { kind ->
+                            Row(Modifier.fillMaxWidth().glass(24.dp).padding(12.dp),verticalAlignment=Alignment.CenterVertically){Glyph(kind.glyph,F.purple,Modifier.size(23.dp));Column(Modifier.weight(1f).padding(start=14.dp)){Text(kind.title,style=F.text(14,true));Text(kind.subtitle,style=F.text(10,muted=true))};GlassIcon("close","Remove ${kind.title}",Modifier.size(32.dp)){model.toggleWidgetForPage(customizePage,kind)}}
                         }
-                        GlassButton("Explore widgets",Modifier.fillMaxWidth(),primary=true,glyph="plus"){navigate("Widgets")}
+                        GlassButton("Explore widgets",Modifier.fillMaxWidth(),primary=true,glyph="plus"){navigate("Widgets:$customizePage")}
+                        }
                     }
                 }
             }

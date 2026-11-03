@@ -33,7 +33,7 @@ internal val tinyControls=setOf(FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidg
         else -> state.device.airplaneMode to (if(state.device.airplaneMode)"On"else"Off")
     }
     val action=when(kind){FluidWidget.WIFI->"wifi";FluidWidget.BLUETOOTH->"bluetooth";FluidWidget.MOBILE_DATA->"mobile";FluidWidget.SOUND->"silent";FluidWidget.FLASHLIGHT->"torch";else->"airplane"}
-    Column(modifier.fillMaxWidth().heightIn(min=when(state.config.sizes[kind]){"Compact"->84.dp;"Large"->130.dp;else->100.dp}).glass(24.dp)
+    Column(modifier.fillMaxWidth().heightIn(min=when(state.config.sizes[kind]){"Compact"->84.dp;"Large"->130.dp;else->100.dp}).widgetGesture(kind,state,model).glass(24.dp)
         .combinedClickable(role=Role.Button,onClick={
             if(kind==FluidWidget.FLASHLIGHT && androidx.core.content.ContextCompat.checkSelfPermission(context,android.Manifest.permission.CAMERA)!=android.content.pm.PackageManager.PERMISSION_GRANTED)camera.launch(android.Manifest.permission.CAMERA)
             else model.toggle(action)

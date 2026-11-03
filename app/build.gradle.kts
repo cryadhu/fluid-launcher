@@ -20,8 +20,8 @@ android {
         applicationId = "com.cry.fluid"
         minSdk = 26
         targetSdk = 35
-        versionCode = 68
-        versionName = "1.1.23"
+        versionCode = 69
+        versionName = "1.1.24"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }

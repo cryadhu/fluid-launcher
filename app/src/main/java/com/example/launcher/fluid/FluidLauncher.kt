@@ -133,21 +133,22 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetGestureMode provides WidgetGestureMode(gestureWidget,gestureResize,gestureSpace,gesturePlan),LocalWidgetEdit provides { widgetEditSpace=state.config.pages.getOrNull(pager.currentPage)=="Space";widgetEditPlan=state.config.pages.getOrNull(pager.currentPage)=="Plan";widgetEdit=it }) {
+    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetGestureMode provides WidgetGestureMode(gestureWidget,gestureResize,gestureSpace,gesturePlan){gestureWidget=null},LocalWidgetEdit provides { widgetEditSpace=state.config.pages.getOrNull(pager.currentPage)=="Space";widgetEditPlan=state.config.pages.getOrNull(pager.currentPage)=="Plan";widgetEdit=it }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
             HorizontalPager(pager,Modifier.fillMaxSize().graphicsLayer { scaleX=1f-drawerProgress*.055f; scaleY=scaleX; alpha=1f-drawerProgress*.48f }.blur((drawerProgress*18).dp)
                 .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null) { index ->
                 val distance = ((pager.currentPage-index)+pager.currentPageOffsetFraction).absoluteValue.coerceAtMost(1f)
-                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(onClick={},onLongClick={showPanel("Customize")})) {
+                val currentPage=state.config.pages[index]
+                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(onClick={},onLongClick={showPanel("Customize:$currentPage")})) {
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
                     when(state.config.pages[index]) {
-                        "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch)
+                        "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize:Home")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch)
                         "Space" -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch)
                         "Plan" -> FluidPlan(state,model,padding,calendarAccess)
                         "Markets" -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
-                        else -> Column(padding,verticalArrangement=Arrangement.spacedBy(12.dp)){FluidHeading(state.config.pages[index],"A fresh page to make your own.");Text("Add widgets from Customize home.",style=F.text(13,muted=true))}
+                        else -> Column(padding.verticalScroll(rememberScrollState()).padding(bottom=100.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){FluidHeading(currentPage,"A fresh page to make your own.");val widgets=model.widgetsForPage(currentPage);if(widgets.isEmpty())Text("Long press empty space to add widgets.",style=F.text(13,muted=true));widgets.forEach{kind->ExpandableWidget(kind,state,model,hero,calendarAccess,activityAccess)}}
                     }
                 }
             }

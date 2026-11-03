@@ -34,7 +34,7 @@ val LocalWeatherLocate = staticCompositionLocalOf<()->Unit> { {} }
 val LocalContactsAccess = staticCompositionLocalOf<()->Unit> { {} }
 val LocalSpaceWidgetGallery = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
-data class WidgetGestureMode(val widget:FluidWidget?=null,val resize:Boolean=false,val space:Boolean=false,val plan:Boolean=false)
+data class WidgetGestureMode(val widget:FluidWidget?=null,val resize:Boolean=false,val space:Boolean=false,val plan:Boolean=false,val settled:()->Unit={})
 private data class WeatherPreview(val code:Int,val label:String,val day:Boolean,val wind:Double)
 val LocalWidgetGestureMode = staticCompositionLocalOf { WidgetGestureMode() }
 internal fun weatherForDisplay(state:FluidState):HomeWeather? {
@@ -219,7 +219,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
             var swapped=0f
             detectDragGestures(onDragStart={dragging=true;x=0f;y=0f;swapped=0f},onDragCancel={dragging=false;x=0f;y=0f},onDragEnd={dragging=false;x=0f;y=0f},onDrag={change,drag ->
                 change.consume();x+=drag.x;y+=drag.y;swapped+=drag.y
-                if(abs(swapped)>70f) { val direction=if(swapped>0)1 else -1;if(mode.plan)model.movePlanWidget(kind,direction)else if(mode.space)model.moveSpaceWidget(kind,direction)else model.moveWidget(kind,direction);swapped=0f;y=0f }
+                if(abs(swapped)>104f) { val direction=if(swapped>0)1 else -1;if(mode.plan)model.movePlanWidget(kind,direction)else if(mode.space)model.moveSpaceWidget(kind,direction)else model.moveWidget(kind,direction);mode.settled();swapped=0f;y=0f }
             })
         }
 }
