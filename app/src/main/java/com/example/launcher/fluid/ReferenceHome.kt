@@ -34,9 +34,7 @@ val LocalWeatherLocate = staticCompositionLocalOf<()->Unit> { {} }
 val LocalContactsAccess = staticCompositionLocalOf<()->Unit> { {} }
 val LocalSpaceWidgetGallery = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
-data class WidgetGestureMode(val widget:FluidWidget?=null,val resize:Boolean=false,val space:Boolean=false,val plan:Boolean=false,val settled:()->Unit={})
 private data class WeatherPreview(val code:Int,val label:String,val day:Boolean,val wind:Double)
-val LocalWidgetGestureMode = staticCompositionLocalOf { WidgetGestureMode() }
 internal fun weatherForDisplay(state:FluidState):HomeWeather? {
     if(state.weatherPreview==0)return state.weather
     val preview=listOf(
@@ -48,37 +46,49 @@ internal fun weatherForDisplay(state:FluidState):HomeWeather? {
 }
 internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==FluidWidget.BRIGHTNESS || kind==FluidWidget.VOLUME) when(config.sizes[kind]) { "Compact"->64.dp;"Large"->112.dp;else->80.dp } else when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
 
-@Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit) {
-    val edit=LocalWidgetEdit.current
-    Column(modifier.navigationBarsPadding().padding(bottom=32.dp).testTag("fluid-home")) {
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).combinedClickable(onClick={},onLongClick=customize).padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-                Text(fluidDate(state.now,"EEEE, MMM d"),style=F.text(12,muted=true),modifier=Modifier.testTag("fluid-home-date"))
-                GlassIcon("edit","Customize home",Modifier.size(34.dp),onClick=customize)
-            }
-            val top=state.config.widgets.filter{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER}
-            if(top.isNotEmpty()) Row(Modifier.fillMaxWidth().animateContentSize(spring(1f,350f)),horizontalArrangement=Arrangement.spacedBy(14.dp),verticalAlignment=Alignment.CenterVertically) {
-                top.forEach{kind ->
-                    val height=when(state.config.sizes[kind]){"Compact"->112.dp;"Large"->210.dp;else->156.dp}
-                    Box(Modifier.weight(if(state.config.sizes[kind]=="Large")1.4f else 1f).height(height).animateContentSize(spring(1f,350f)).widgetGesture(kind,state,model).testTag("fluid-widget-${kind.name}")) {
-                        if(kind==FluidWidget.CLOCK) AnalogClock(state.now,Modifier.fillMaxSize()){model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))}
-                        else WeatherScene(state,Modifier.fillMaxSize(),{hero.open(kind)}, {edit(kind)})
-                        // The unframed weather still participates in the same shared card transition.
-                        Box(Modifier.fillMaxSize().onGloballyPositioned{hero.bounds[kind]=Rect(it.positionInRoot(),it.size.toSize())})
+@Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit,edit:PageEdit?=null,finishEdit:()->Unit={}) {
+    val openEdit=LocalWidgetEdit.current
+    val editable=state.config.widgets.filterNot{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER || it in tinyControls}
+    val scroll=rememberScrollState()
+    val density=LocalDensity.current
+    val phase=rememberInfiniteTransition(label="Widget wobble").animateFloat(0f,6.2831855f,infiniteRepeatable(tween(900,easing=LinearEasing)),label="Wobble")
+    SideEffect { edit?.bind(editable,with(density){14.dp.toPx()},scroll) }
+    Box(modifier.navigationBarsPadding().padding(bottom=32.dp).onGloballyPositioned{edit?.viewport=it.boundsInRoot()}.testTag("fluid-home")) {
+        Column(Modifier.fillMaxSize()) {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).combinedClickable(onClick={},onLongClick=customize).padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+                    Text(fluidDate(state.now,"EEEE, MMM d"),style=F.text(12,muted=true),modifier=Modifier.testTag("fluid-home-date"))
+                    if(edit==null) GlassIcon("edit","Customize home",Modifier.size(34.dp),onClick=customize) else Spacer(Modifier.size(34.dp))
+                }
+                val top=state.config.widgets.filter{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER}
+                if(top.isNotEmpty()) Row(Modifier.fillMaxWidth().animateContentSize(spring(1f,350f)),horizontalArrangement=Arrangement.spacedBy(14.dp),verticalAlignment=Alignment.CenterVertically) {
+                    top.forEach{kind ->
+                        val height=when(state.config.sizes[kind]){"Compact"->112.dp;"Large"->210.dp;else->156.dp}
+                        Box(Modifier.weight(if(state.config.sizes[kind]=="Large")1.4f else 1f).height(height).animateContentSize(spring(1f,350f)).testTag("fluid-widget-${kind.name}")) {
+                            if(kind==FluidWidget.CLOCK) AnalogClock(state.now,Modifier.fillMaxSize()){model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))}
+                            else WeatherScene(state,Modifier.fillMaxSize(),{hero.open(kind)}, {openEdit(kind)})
+                            // The unframed weather still participates in the same shared card transition.
+                            Box(Modifier.fillMaxSize().onGloballyPositioned{hero.bounds[kind]=Rect(it.positionInRoot(),it.size.toSize())})
+                        }
                     }
                 }
+                editable.forEachIndexed{index,kind -> key(kind){
+                    Box(Modifier.pageEditCard(kind,edit,phase,index)) {
+                        Column(Modifier.fillMaxWidth()) {
+                            if(kind==FluidWidget.NOTIFICATIONS) Box(Modifier.onGloballyPositioned { hero.bounds[kind]=it.boundsInRoot() }) { NotificationStack(state,model) }
+                            else {
+                                Text(if(kind==FluidWidget.AGENDA)"Today" else kind.title,style=F.text(11,muted=true),modifier=Modifier.padding(start=8.dp,top=2.dp))
+                                ExpandableWidget(kind,state,model,hero,calendar,activity)
+                            }
+                        }
+                        if(edit!=null && edit.active) Box(Modifier.matchParentSize().pageEditDrag(kind,edit))
+                    }
+                } }
+                ControlWidgetRows(state.config.widgets.filter{it in tinyControls},state,model)
             }
-            state.config.widgets.filterNot{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER || it in tinyControls}.forEach{kind -> key(kind){
-                if(kind==FluidWidget.NOTIFICATIONS) Box(Modifier.widgetGesture(kind,state,model).onGloballyPositioned { hero.bounds[kind]=it.boundsInRoot() }) { NotificationStack(state,model) }
-                else {
-                    Text(if(kind==FluidWidget.AGENDA)"Today" else kind.title,style=F.text(11,muted=true),modifier=Modifier.padding(start=8.dp,top=2.dp))
-                    ExpandableWidget(kind,state,model,hero,calendar,activity)
-                }
-            } }
-            ControlWidgetRows(state.config.widgets.filter{it in tinyControls},state,model)
+            FluidDock(state, model, badges, ask, launch)
         }
-        FluidDock(state, model, badges, ask, launch)
-
+        edit?.let { PageEditOverlay(it,finishEdit) }
     }
 }
 
@@ -170,63 +180,32 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     }
 }
 
-@Composable internal fun WidgetEditSheet(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,plan:Boolean=false,arrange:()->Unit,resize:()->Unit,close:()->Unit) {
+@Composable internal fun WidgetEditSheet(kind:FluidWidget,page:String,state:FluidState,model:FluidModel,arrange:()->Unit,resize:()->Unit,close:()->Unit) {
+    val canArrange=kind !in tinyControls && !(page=="Home" && (kind==FluidWidget.CLOCK || kind==FluidWidget.WEATHER))
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=.09f)).clickable(onClick=close).statusBarsPadding().navigationBarsPadding().padding(22.dp),contentAlignment=Alignment.BottomCenter) {
         Column(Modifier.fillMaxWidth().glass(32.dp,true).clickable{}.padding(22.dp).testTag("widget-edit"),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically){Text(kind.title,style=F.text(22,true),modifier=Modifier.weight(1f));GlassIcon("close","Close widget options",onClick=close)}
-            Text("Edit with gestures",style=F.text(12,muted=true))
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                GlassButton("Arrange",Modifier.weight(1f),glyph="app") { arrange(); close() }
-                GlassButton("Resize",Modifier.weight(1f),glyph="settings") { resize(); close() }
+            Text("Size",style=F.text(13,true))
+            WidgetSizeOptions(state.config.sizes[kind] ?: "Standard"){model.resizeWidget(kind,it)}
+            if(canArrange) {
+                Text("Edit with gestures",style=F.text(12,muted=true))
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                    GlassButton("Arrange",Modifier.weight(1f),glyph="app") { arrange(); close() }
+                    GlassButton("Resize",Modifier.weight(1f),glyph="settings") { resize(); close() }
+                }
+                Text("Arrange: drag widgets directly on the page and they settle into place. Resize: drag a handle to change size.",style=F.text(11,muted=true))
+            } else {
+                GlassButton("Resize",Modifier.fillMaxWidth(),glyph="settings") { resize(); close() }
+                Text("Drag a handle to change this widget's size.",style=F.text(11,muted=true))
             }
-            Text("Arrange: drag vertically to swap widgets. Resize: drag horizontally or vertically to change size.",style=F.text(11,muted=true))
-            GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){if(plan)model.togglePlanWidget(kind)else if(space)model.removeSpaceWidget(kind)else if(kind in state.config.widgets)model.toggleWidget(kind);close()}
+            GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){model.removeWidgetForPage(page,kind);close()}
         }
-    }
-}
-
-/** A page-level edit mode rather than a contextual menu: the card under the finger lifts,
- * candidate slots remain visible, and the remove target becomes active at the bottom. */
-@Composable internal fun RearrangeWidgets(page:String,state:FluidState,model:FluidModel,done:()->Unit) {
-    val widgets=model.widgetsForPage(page)
-    var moving by remember { mutableStateOf<FluidWidget?>(null) }
-    var removeTop by remember { mutableFloatStateOf(Float.MAX_VALUE) }
-    Box(Modifier.fillMaxSize().background(Color(0xFF443663).copy(alpha=.22f)).statusBarsPadding().navigationBarsPadding().padding(18.dp).testTag("fluid-rearrange")) {
-        val density=LocalDensity.current
-        Column(Modifier.fillMaxSize().glass(34.dp,true).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text("Rearrange",style=F.text(26,true));Text("Hold and drag · drop in a highlighted slot",style=F.text(12,muted=true))};GlassButton("Done",glyph="check",primary=true,onClick=done) }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                widgets.forEach { widget -> key(widget) {
-                    RearrangeCard(widget,widgets.indexOf(widget),moving==widget,state,model,page,removeTop,{moving=it})
-                } }
-                if(widgets.isEmpty()) Text("This page is ready for widgets. Long press empty space after adding widgets in Customize.",style=F.text(13,muted=true),modifier=Modifier.padding(16.dp))
-            }
-            Row(Modifier.fillMaxWidth().height(78.dp).onGloballyPositioned { removeTop=it.positionInRoot().y }.border(2.dp,Color(0xFFE05B67).copy(alpha=.8f),RoundedCornerShape(26.dp)).background(Color(0xFFE05B67).copy(alpha=.10f),RoundedCornerShape(26.dp)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) { Glyph("bin",Color(0xFFE05B67),Modifier.size(24.dp));Text("  Drag here to remove",style=F.text(16,true),color=Color(0xFFE05B67)) }
-        }
-    }
-}
-
-@Composable private fun RearrangeCard(kind:FluidWidget,index:Int,isMoving:Boolean,state:FluidState,model:FluidModel,page:String,removeTop:Float,setMoving:(FluidWidget?)->Unit) {
-    var dragY by remember(kind) { mutableFloatStateOf(0f) }
-    var cardTop by remember(kind) { mutableFloatStateOf(0f) }
-    val lift by animateFloatAsState(if(isMoving)1.035f else 1f,spring(.78f,420f),label="Card lift")
-    val offset by animateFloatAsState(if(isMoving)dragY else 0f,spring(.82f,380f),label="Card settle")
-    val wobble by rememberInfiniteTransition(label="Edit card wobble").animateFloat(-1.15f,1.15f,infiniteRepeatable(tween(480,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="Card wobble")
-    Column(Modifier.fillMaxWidth().onGloballyPositioned{cardTop=it.positionInRoot().y}.graphicsLayer { translationY=offset;scaleX=lift;scaleY=lift;rotationZ=if(isMoving)wobble else 0f;shadowElevation=if(isMoving)18.dp.toPx() else 0f }.border(2.dp,if(isMoving)F.purple else F.purple.copy(alpha=.38f),RoundedCornerShape(25.dp)).glass(25.dp,true).pointerInput(kind,removeTop){
-        var accumulated=0f
-        detectDragGestures(onDragStart={setMoving(kind);dragY=0f;accumulated=0f},onDragCancel={setMoving(null);dragY=0f},onDragEnd={if(cardTop+dragY>removeTop-30f)model.removeWidgetForPage(page,kind);setMoving(null);dragY=0f},onDrag={change,drag->
-            change.consume();dragY+=drag.y;accumulated+=drag.y
-            if(abs(accumulated)>96f){model.moveWidgetForPage(page,kind,if(accumulated>0)1 else -1);accumulated=0f;dragY=0f}
-        })
-    }.padding(16.dp)) {
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Glyph(kind.glyph,F.purple,Modifier.size(23.dp));Text(kind.title,style=F.text(16,true),modifier=Modifier.padding(start=10.dp).weight(1f));Text("Drag",style=F.text(11,muted=true))}
-        Spacer(Modifier.height(8.dp));WidgetBody(kind,state,model,compact=true)
     }
 }
 
 /** Full-screen, grid-based resize surface.  The corner/edge handles and preview deliberately mirror
  * the home layout so changing size never feels like a disconnected setting. */
-@Composable internal fun WidgetResizeEditor(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,plan:Boolean=false,done:()->Unit) {
+@Composable internal fun WidgetResizeEditor(kind:FluidWidget,state:FluidState,model:FluidModel,page:String,done:()->Unit) {
     val size=state.config.sizes[kind] ?: "Standard"
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=.13f)).statusBarsPadding().navigationBarsPadding().padding(18.dp)) {
         Column(Modifier.fillMaxSize().glass(30.dp,true).padding(20.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -243,24 +222,9 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
             }
             Text("Widget size",style=F.text(14,true));WidgetSizeOptions(size){model.resizeWidget(kind,it)}
             Text("Use the handles to stretch the widget. The launcher snaps it to the nearest available grid size.",style=F.text(11,muted=true))
-            GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){ if(plan)model.togglePlanWidget(kind) else if(space)model.removeSpaceWidget(kind) else model.toggleWidget(kind);done() }
+            GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){ model.removeWidgetForPage(page,kind);done() }
         }
     }
-}
-
-@Composable internal fun Modifier.widgetGesture(kind:FluidWidget,state:FluidState,model:FluidModel):Modifier {
-    val mode=LocalWidgetGestureMode.current
-    if(mode.widget!=kind)return this
-    var dragging by remember(kind) { mutableStateOf(false) }; var x by remember(kind){mutableFloatStateOf(0f)};var y by remember(kind){mutableFloatStateOf(0f)}
-    val phase by rememberInfiniteTransition(label="Arrange wobble").animateFloat(0f,6.283f,infiniteRepeatable(tween(460,easing=LinearEasing)),label="Wobble phase")
-    return graphicsLayer { translationX=x;translationY=y;rotationZ=if(dragging)0f else sin(phase)*1.45f;scaleX=if(dragging)1.035f else 1f;scaleY=if(dragging)1.035f else 1f;shadowElevation=if(dragging)16.dp.toPx() else 0f }
-        .pointerInput(kind,mode.space,mode.plan) {
-            var swapped=0f
-            detectDragGestures(onDragStart={dragging=true;x=0f;y=0f;swapped=0f},onDragCancel={dragging=false;x=0f;y=0f},onDragEnd={dragging=false;x=0f;y=0f},onDrag={change,drag ->
-                change.consume();x+=drag.x;y+=drag.y;swapped+=drag.y
-                if(abs(swapped)>104f) { val direction=if(swapped>0)1 else -1;if(mode.plan)model.movePlanWidget(kind,direction)else if(mode.space)model.moveSpaceWidget(kind,direction)else model.moveWidget(kind,direction);mode.settled();swapped=0f;y=0f }
-            })
-        }
 }
 
 @Composable internal fun WidgetSizeOptions(selected:String,select:(String)->Unit) {

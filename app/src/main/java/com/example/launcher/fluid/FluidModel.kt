@@ -152,6 +152,21 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     fun toggleWidgetForPage(page:String,widget:FluidWidget) = when(page) { "Home"->toggleWidget(widget);"Space"->toggleSpaceWidget(widget);"Plan"->togglePlanWidget(widget);else->configure { c -> val current=c.pageWidgets[page].orEmpty();c.copy(pageWidgets=c.pageWidgets+(page to if(widget in current)current-widget else current+widget)) } }
     fun removeWidgetForPage(page:String,widget:FluidWidget) = when(page) { "Home"->toggleWidget(widget);"Space"->removeSpaceWidget(widget);"Plan"->togglePlanWidget(widget);else->configure { c -> c.copy(pageWidgets=c.pageWidgets+(page to c.pageWidgets[page].orEmpty().filterNot{it==widget})) } }
     fun moveWidgetForPage(page:String,widget:FluidWidget,delta:Int) = when(page) { "Home"->moveWidget(widget,delta);"Space"->moveSpaceWidget(widget,delta);"Plan"->movePlanWidget(widget,delta);else->configure { c -> val list=c.pageWidgets[page].orEmpty().toMutableList();val from=list.indexOf(widget);val to=(from+delta).coerceIn(0,(list.size-1).coerceAtLeast(0));if(from>=0){list.removeAt(from);list.add(to,widget)};c.copy(pageWidgets=c.pageWidgets+(page to list)) } }
+    /** Rewrites only the slots occupied by [visible] so hidden groups (top-row clock/weather,
+     * tiny controls) keep their storage positions while the on-page order changes. */
+    fun reorderVisibleWidgetsForPage(page:String,visible:List<FluidWidget>,newVisible:List<FluidWidget>) {
+        fun reorder(list:List<FluidWidget>):List<FluidWidget> {
+            val slots=list.indices.filter{list[it] in visible}
+            if(slots.size!=newVisible.size)return list
+            val result=list.toMutableList()
+            slots.forEachIndexed{i,slot->result[slot]=newVisible[i]}
+            return result
+        }
+        configure { c -> when(page) {
+            "Home"->c.copy(widgets=reorder(c.widgets));"Space"->c.copy(spaceWidgets=reorder(c.spaceWidgets));"Plan"->c.copy(planWidgets=reorder(c.planWidgets))
+            else->c.copy(pageWidgets=c.pageWidgets+(page to reorder(c.pageWidgets[page].orEmpty())))
+        } }
+    }
     fun assign(app: InstalledApp, space: String) = configure { c ->
         val key = app.component.flattenToString()
         c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key, tools=if(space=="Tools")c.tools+key else c.tools-key)
