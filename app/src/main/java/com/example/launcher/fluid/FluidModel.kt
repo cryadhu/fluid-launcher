@@ -150,6 +150,8 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     }
     fun widgetsForPage(page:String):List<FluidWidget> = when(page) { "Home"->mutable.value.config.widgets; "Space"->mutable.value.config.spaceWidgets; "Plan"->mutable.value.config.planWidgets; else->mutable.value.config.pageWidgets[page].orEmpty() }
     fun toggleWidgetForPage(page:String,widget:FluidWidget) = when(page) { "Home"->toggleWidget(widget);"Space"->toggleSpaceWidget(widget);"Plan"->togglePlanWidget(widget);else->configure { c -> val current=c.pageWidgets[page].orEmpty();c.copy(pageWidgets=c.pageWidgets+(page to if(widget in current)current-widget else current+widget)) } }
+    fun removeWidgetForPage(page:String,widget:FluidWidget) = when(page) { "Home"->toggleWidget(widget);"Space"->removeSpaceWidget(widget);"Plan"->togglePlanWidget(widget);else->configure { c -> c.copy(pageWidgets=c.pageWidgets+(page to c.pageWidgets[page].orEmpty().filterNot{it==widget})) } }
+    fun moveWidgetForPage(page:String,widget:FluidWidget,delta:Int) = when(page) { "Home"->moveWidget(widget,delta);"Space"->moveSpaceWidget(widget,delta);"Plan"->movePlanWidget(widget,delta);else->configure { c -> val list=c.pageWidgets[page].orEmpty().toMutableList();val from=list.indexOf(widget);val to=(from+delta).coerceIn(0,(list.size-1).coerceAtLeast(0));if(from>=0){list.removeAt(from);list.add(to,widget)};c.copy(pageWidgets=c.pageWidgets+(page to list)) } }
     fun assign(app: InstalledApp, space: String) = configure { c ->
         val key = app.component.flattenToString()
         c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key, tools=if(space=="Tools")c.tools+key else c.tools-key)

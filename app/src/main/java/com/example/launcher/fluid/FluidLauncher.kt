@@ -66,6 +66,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     var widgetEditSpace by remember { mutableStateOf(false) }
     var widgetEditPlan by remember { mutableStateOf(false) }
     var widgetEdit by remember { mutableStateOf<FluidWidget?>(null) }
+    var rearrangePage by remember { mutableStateOf<String?>(null) }
     var gestureWidget by remember { mutableStateOf<FluidWidget?>(null) }
     var gestureResize by remember { mutableStateOf(false) }
     var gestureSpace by remember { mutableStateOf(false) }
@@ -129,11 +130,11 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     var handledHomeEpoch by rememberSaveable { mutableIntStateOf(state.homeEpoch) }
     LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0 && state.homeEpoch!=handledHomeEpoch) { handledHomeEpoch=state.homeEpoch; drawerGesture=null; widgetEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.9f,320f)) } }
     BackHandler {
-        when { resizeEditor!=null -> resizeEditor=null; widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panelBack(); drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
+        when { rearrangePage!=null -> rearrangePage=null; resizeEditor!=null -> resizeEditor=null; widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panelBack(); drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
-    val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetGestureMode provides WidgetGestureMode(gestureWidget,gestureResize,gestureSpace,gesturePlan){gestureWidget=null},LocalWidgetEdit provides { widgetEditSpace=state.config.pages.getOrNull(pager.currentPage)=="Space";widgetEditPlan=state.config.pages.getOrNull(pager.currentPage)=="Plan";widgetEdit=it }) {
+    val panelBlur by animateDpAsState(if(rearrangePage!=null || widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
+    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetGestureMode provides WidgetGestureMode(gestureWidget,gestureResize,gestureSpace,gesturePlan){gestureWidget=null},LocalWidgetEdit provides { rearrangePage=state.config.pages.getOrNull(pager.currentPage) ?: "Home" }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
@@ -173,6 +174,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
         }
         widgetEdit?.let { selected -> WidgetEditSheet(selected,state,model,space=widgetEditSpace,plan=widgetEditPlan,arrange={gestureWidget=selected;gestureResize=false;gestureSpace=widgetEditSpace;gesturePlan=widgetEditPlan},resize={resizeEditor=selected}) { widgetEdit=null } }
         resizeEditor?.let { selected -> WidgetResizeEditor(selected,state,model,space=widgetEditSpace,plan=widgetEditPlan){resizeEditor=null} }
+        rearrangePage?.let { page -> RearrangeWidgets(page,state,model){rearrangePage=null} }
         launching?.let { AppLaunchBloom(it,launchRect,sceneSize) }
         AnimatedVisibility(state.message!=null,Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal=20.dp,vertical=68.dp),enter=fadeIn()+slideInVertically{it/2},exit=fadeOut()) {
             Text(state.message.orEmpty(),style=F.text(13),modifier=Modifier.glass(24.dp,true).padding(horizontal=20.dp,vertical=14.dp))

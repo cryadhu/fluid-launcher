@@ -185,6 +185,45 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     }
 }
 
+/** A page-level edit mode rather than a contextual menu: the card under the finger lifts,
+ * candidate slots remain visible, and the remove target becomes active at the bottom. */
+@Composable internal fun RearrangeWidgets(page:String,state:FluidState,model:FluidModel,done:()->Unit) {
+    val widgets=model.widgetsForPage(page)
+    var moving by remember { mutableStateOf<FluidWidget?>(null) }
+    var removeTop by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+    Box(Modifier.fillMaxSize().background(Color(0xFF443663).copy(alpha=.22f)).statusBarsPadding().navigationBarsPadding().padding(18.dp).testTag("fluid-rearrange")) {
+        val density=LocalDensity.current
+        Column(Modifier.fillMaxSize().glass(34.dp,true).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text("Rearrange",style=F.text(26,true));Text("Hold and drag · drop in a highlighted slot",style=F.text(12,muted=true))};GlassButton("Done",glyph="check",primary=true,onClick=done) }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                widgets.forEach { widget -> key(widget) {
+                    RearrangeCard(widget,widgets.indexOf(widget),moving==widget,state,model,page,removeTop,{moving=it})
+                } }
+                if(widgets.isEmpty()) Text("This page is ready for widgets. Long press empty space after adding widgets in Customize.",style=F.text(13,muted=true),modifier=Modifier.padding(16.dp))
+            }
+            Row(Modifier.fillMaxWidth().height(78.dp).onGloballyPositioned { removeTop=it.positionInRoot().y }.border(2.dp,Color(0xFFE05B67).copy(alpha=.8f),RoundedCornerShape(26.dp)).background(Color(0xFFE05B67).copy(alpha=.10f),RoundedCornerShape(26.dp)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) { Glyph("bin",Color(0xFFE05B67),Modifier.size(24.dp));Text("  Drag here to remove",style=F.text(16,true),color=Color(0xFFE05B67)) }
+        }
+    }
+}
+
+@Composable private fun RearrangeCard(kind:FluidWidget,index:Int,isMoving:Boolean,state:FluidState,model:FluidModel,page:String,removeTop:Float,setMoving:(FluidWidget?)->Unit) {
+    var dragY by remember(kind) { mutableFloatStateOf(0f) }
+    var cardTop by remember(kind) { mutableFloatStateOf(0f) }
+    val lift by animateFloatAsState(if(isMoving)1.035f else 1f,spring(.78f,420f),label="Card lift")
+    val offset by animateFloatAsState(if(isMoving)dragY else 0f,spring(.82f,380f),label="Card settle")
+    val wobble by rememberInfiniteTransition(label="Edit card wobble").animateFloat(-1.15f,1.15f,infiniteRepeatable(tween(480,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="Card wobble")
+    Column(Modifier.fillMaxWidth().onGloballyPositioned{cardTop=it.positionInRoot().y}.graphicsLayer { translationY=offset;scaleX=lift;scaleY=lift;rotationZ=if(isMoving)wobble else 0f;shadowElevation=if(isMoving)18.dp.toPx() else 0f }.border(2.dp,if(isMoving)F.purple else F.purple.copy(alpha=.38f),RoundedCornerShape(25.dp)).glass(25.dp,true).pointerInput(kind,removeTop){
+        var accumulated=0f
+        detectDragGestures(onDragStart={setMoving(kind);dragY=0f;accumulated=0f},onDragCancel={setMoving(null);dragY=0f},onDragEnd={if(cardTop+dragY>removeTop-30f)model.removeWidgetForPage(page,kind);setMoving(null);dragY=0f},onDrag={change,drag->
+            change.consume();dragY+=drag.y;accumulated+=drag.y
+            if(abs(accumulated)>96f){model.moveWidgetForPage(page,kind,if(accumulated>0)1 else -1);accumulated=0f;dragY=0f}
+        })
+    }.padding(16.dp)) {
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Glyph(kind.glyph,F.purple,Modifier.size(23.dp));Text(kind.title,style=F.text(16,true),modifier=Modifier.padding(start=10.dp).weight(1f));Text("Drag",style=F.text(11,muted=true))}
+        Spacer(Modifier.height(8.dp));WidgetBody(kind,state,model,compact=true)
+    }
+}
+
 /** Full-screen, grid-based resize surface.  The corner/edge handles and preview deliberately mirror
  * the home layout so changing size never feels like a disconnected setting. */
 @Composable internal fun WidgetResizeEditor(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,plan:Boolean=false,done:()->Unit) {
