@@ -41,7 +41,7 @@ data class WifiNetwork(val ssid: String, val capabilities: String, val level: In
 enum class SoundMode(val label: String) { NORMAL("Normal"), VIBRATE("Vibrate"), SILENT("Silent");
     fun next() = when (this) { NORMAL -> SILENT; SILENT -> VIBRATE; VIBRATE -> NORMAL }
 }
-data class DeviceState(val wifi: Boolean = false, val bluetooth: Boolean? = null, val torch: Boolean = false, val hasTorch: Boolean = false, val silent: Boolean = false, val calendarGranted: Boolean = false, val events: List<AgendaEvent> = emptyList(), val calendarError: Boolean = false, val mediaAccess: Boolean = false, val mediaTitle: String? = null, val playing: Boolean = false, val defaultHome: Boolean = false,
+data class DeviceState(val wifi: Boolean = false, val bluetooth: Boolean? = null, val torch: Boolean = false, val hasTorch: Boolean = false, val silent: Boolean = false, val calendarGranted: Boolean = false, val events: List<AgendaEvent> = emptyList(), val calendarError: Boolean = false, val mediaAccess: Boolean = false, val mediaTitle: String? = null, val mediaArtwork: android.graphics.Bitmap? = null, val playing: Boolean = false, val defaultHome: Boolean = false,
     val wifiConnected: Boolean = false, val wifiName: String? = null, val bluetoothAvailable: Boolean = true, val bluetoothGranted: Boolean = false, val pairedDevices: List<PairedDevice> = emptyList(),
     val wifiNetworks: List<WifiNetwork> = emptyList(), val wifiScanGranted: Boolean = false, val locationEnabled: Boolean = false,
     val soundMode: SoundMode = SoundMode.NORMAL, val mobileData: Boolean? = null, val mobileAvailable: Boolean = false,
@@ -143,6 +143,8 @@ class DeviceRepository(private val context: Context) {
             torch = torchOn, hasTorch = cameraId != null, silent = audio.ringerMode != AudioManager.RINGER_MODE_NORMAL,
             calendarGranted = granted, events = calendar.getOrDefault(emptyList()), calendarError = calendar.isFailure,
             mediaAccess = access, mediaTitle = active?.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: active?.let { "Media session" },
+            mediaArtwork = active?.metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: active?.metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART),
             playing = active?.playbackState?.state == PlaybackState.STATE_PLAYING,
             defaultHome = HomeSetup.isDefaultHome(context), wifiConnected = wifiConnected, wifiName = wifiName,
             bluetoothAvailable = bluetooth != null, bluetoothGranted = bluetoothGranted, pairedDevices = paired,

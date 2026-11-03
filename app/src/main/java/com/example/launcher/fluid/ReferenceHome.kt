@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import com.example.launcher.data.InstalledApp
+import com.example.launcher.data.HomeWeather
 import com.example.launcher.ui.Glyph
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,6 +34,18 @@ val LocalWeatherLocate = staticCompositionLocalOf<()->Unit> { {} }
 val LocalContactsAccess = staticCompositionLocalOf<()->Unit> { {} }
 val LocalSpaceWidgetGallery = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
+data class WidgetGestureMode(val widget:FluidWidget?=null,val resize:Boolean=false,val space:Boolean=false,val plan:Boolean=false)
+private data class WeatherPreview(val code:Int,val label:String,val day:Boolean,val wind:Double)
+val LocalWidgetGestureMode = staticCompositionLocalOf { WidgetGestureMode() }
+internal fun weatherForDisplay(state:FluidState):HomeWeather? {
+    if(state.weatherPreview==0)return state.weather
+    val preview=listOf(
+        WeatherPreview(0,"Sunny",true,5.0), WeatherPreview(3,"Cloudy",true,9.0), WeatherPreview(63,"Rainy",true,14.0),
+        WeatherPreview(71,"Snow",true,7.0), WeatherPreview(45,"Misty",true,5.0), WeatherPreview(2,"Windy",true,32.0), WeatherPreview(1,"Clear night",false,4.0)
+    )[state.weatherPreview]
+    val base=state.weather ?: HomeWeather("Preview",22.0,preview.label,emptyList(),preview.code,preview.day,preview.wind)
+    return base.copy(code=preview.code,condition=preview.label,isDay=preview.day,windSpeed=preview.wind)
+}
 internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==FluidWidget.BRIGHTNESS || kind==FluidWidget.VOLUME) when(config.sizes[kind]) { "Compact"->64.dp;"Large"->112.dp;else->80.dp } else when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
 
 @Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit) {
@@ -47,7 +60,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
             if(top.isNotEmpty()) Row(Modifier.fillMaxWidth().animateContentSize(spring(1f,350f)),horizontalArrangement=Arrangement.spacedBy(14.dp),verticalAlignment=Alignment.CenterVertically) {
                 top.forEach{kind ->
                     val height=when(state.config.sizes[kind]){"Compact"->112.dp;"Large"->210.dp;else->156.dp}
-                    Box(Modifier.weight(if(state.config.sizes[kind]=="Large")1.4f else 1f).height(height).animateContentSize(spring(1f,350f)).testTag("fluid-widget-${kind.name}")) {
+                    Box(Modifier.weight(if(state.config.sizes[kind]=="Large")1.4f else 1f).height(height).animateContentSize(spring(1f,350f)).widgetGesture(kind,state,model).testTag("fluid-widget-${kind.name}")) {
                         if(kind==FluidWidget.CLOCK) AnalogClock(state.now,Modifier.fillMaxSize()){model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))}
                         else WeatherScene(state,Modifier.fillMaxSize(),{hero.open(kind)}, {edit(kind)})
                         // The unframed weather still participates in the same shared card transition.
@@ -56,7 +69,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                 }
             }
             state.config.widgets.filterNot{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER || it in tinyControls}.forEach{kind -> key(kind){
-                if(kind==FluidWidget.NOTIFICATIONS) Box(Modifier.onGloballyPositioned { hero.bounds[kind]=it.boundsInRoot() }) { NotificationStack(state,model) }
+                if(kind==FluidWidget.NOTIFICATIONS) Box(Modifier.widgetGesture(kind,state,model).onGloballyPositioned { hero.bounds[kind]=it.boundsInRoot() }) { NotificationStack(state,model) }
                 else {
                     Text(if(kind==FluidWidget.AGENDA)"Today" else kind.title,style=F.text(11,muted=true),modifier=Modifier.padding(start=8.dp,top=2.dp))
                     ExpandableWidget(kind,state,model,hero,calendar,activity)
@@ -74,9 +87,12 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     val time=Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
     // Keep an unwrapped angle so the hand crosses 59 -> 00 naturally. The first
     // frame is snapped to real time instead of animating all the way from 12.
-    val secondTarget=((time.hour % 12)*3600+time.minute*60+time.second+time.nano/1_000_000_000f)*6f
+    val secondTarget=(time.second+time.nano/1_000_000_000f)*6f
     val secondHand=remember { Animatable(secondTarget) }
-    LaunchedEffect(secondTarget) { secondHand.animateTo(secondTarget,tween(950,easing=LinearEasing)) }
+    LaunchedEffect(time.minute,time.second) {
+        val delta=((secondTarget-secondHand.value+540f)%360f)-180f
+        secondHand.animateTo(secondHand.value+delta,tween(850,easing=LinearEasing))
+    }
     val seconds=secondHand.value
     val ink=F.ink
     val face=if(LocalGlass.current.dark)Color(0xFF35403D)else Color.White
@@ -102,7 +118,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     val transition=rememberInfiniteTransition(label="Weather atmosphere")
     val drift by transition.animateFloat(-3f,3f,infiniteRepeatable(tween(3200,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="Cloud drift")
     val rain by transition.animateFloat(0f,1f,infiniteRepeatable(tween(1400,easing=LinearEasing)),label="Rain fall")
-    val weather=state.weather
+    val weather=weatherForDisplay(state)
     val code=weather?.code ?: -1
     val wet=code in 51..67 || code in 80..82 || code in 95..99
     val snow=code in 71..77 || code in 85..86
@@ -110,8 +126,8 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     val night=weather?.isDay==false
     val windy=(weather?.windSpeed ?: 0.0)>=20
     val cloudy=code in 1..3 || wet || snow || fog
-    val temp=state.weather?.temperature?.roundToInt()?.let{"$it\u00b0"} ?: "--\u00b0"
-    Box(modifier.combinedClickable(onClick=click,onLongClick=hold).semantics{contentDescription="Weather $temp ${state.weather?.condition ?: "Choose city"}"}) {
+    val temp=weather?.temperature?.roundToInt()?.let{"$it\u00b0"} ?: "--\u00b0"
+    Box(modifier.combinedClickable(onClick=click,onLongClick=hold).semantics{contentDescription="Weather $temp ${weather?.condition ?: "Choose city"}"}) {
         Canvas(Modifier.fillMaxSize().graphicsLayer{translationX=drift.dp.toPx()}) {
             val x=size.width*.32f;val y=size.height*.47f;val unit=size.minDimension
             if(weather!=null && !night && !fog && !wet && !snow && code!=3){
@@ -148,23 +164,43 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
         }
         Column(Modifier.align(Alignment.CenterEnd).widthIn(min=94.dp).glass(27.dp).padding(horizontal=17.dp,vertical=20.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             AnimatedContent(temp,transitionSpec={(fadeIn(tween(350))+slideInVertically{it/4}) togetherWith fadeOut(tween(200))},label="Weather temperature"){value->Text(value,style=F.text(35))}
-            Text(state.weather?.condition ?: if(state.weatherLoading) "Locating..." else if(state.config.autoWeather) "Location needed" else "Choose city",style=F.text(9,muted=true),maxLines=2,modifier=Modifier.widthIn(max=86.dp))
-            state.weather?.let{Text(it.city.substringBefore(','),style=F.text(8,muted=true),maxLines=1,modifier=Modifier.padding(top=5.dp))}
+            Text(weather?.condition ?: if(state.weatherLoading) "Locating..." else if(state.config.autoWeather) "Location needed" else "Choose city",style=F.text(9,muted=true),maxLines=2,modifier=Modifier.widthIn(max=86.dp))
+            weather?.let{Text(it.city.substringBefore(','),style=F.text(8,muted=true),maxLines=1,modifier=Modifier.padding(top=5.dp))}
         }
     }
 }
 
-@Composable internal fun WidgetEditSheet(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,plan:Boolean=false,close:()->Unit) {
+@Composable internal fun WidgetEditSheet(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,plan:Boolean=false,arrange:()->Unit,resize:()->Unit,close:()->Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=.09f)).clickable(onClick=close).statusBarsPadding().navigationBarsPadding().padding(22.dp),contentAlignment=Alignment.BottomCenter) {
         Column(Modifier.fillMaxWidth().glass(32.dp,true).clickable{}.padding(22.dp).testTag("widget-edit"),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically){Text(kind.title,style=F.text(22,true),modifier=Modifier.weight(1f));GlassIcon("close","Close widget options",onClick=close)}
-            Text("Widget size",style=F.text(12,muted=true))
-            WidgetSizeOptions(state.config.sizes[kind] ?: "Standard") { model.resizeWidget(kind,it) }
-            val list=when{plan->state.config.planWidgets;space->state.config.spaceWidgets;else->state.config.widgets}
-            val index=list.indexOf(kind)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) { GlassButton("Move up",Modifier.weight(1f),glyph="up"){if(plan)model.movePlanWidget(kind,-1)else if(!space)model.moveWidget(kind,-1)};GlassButton("Move down",Modifier.weight(1f),glyph="next"){if(plan)model.movePlanWidget(kind,1)else if(!space)model.moveWidget(kind,1)} }
+            Text("Edit with gestures",style=F.text(12,muted=true))
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                GlassButton("Arrange",Modifier.weight(1f),glyph="app") { arrange(); close() }
+                GlassButton("Resize",Modifier.weight(1f),glyph="settings") { resize(); close() }
+            }
+            Text("Arrange: drag vertically to swap widgets. Resize: drag horizontally or vertically to change size.",style=F.text(11,muted=true))
             GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){if(plan)model.togglePlanWidget(kind)else if(space)model.removeSpaceWidget(kind)else if(kind in state.config.widgets)model.toggleWidget(kind);close()}
         }
+    }
+}
+
+@Composable internal fun Modifier.widgetGesture(kind:FluidWidget,state:FluidState,model:FluidModel):Modifier {
+    val mode=LocalWidgetGestureMode.current
+    if(mode.widget!=kind)return this
+    return pointerInput(kind,mode.resize,mode.space,mode.plan) {
+        var dx=0f; var dy=0f
+        detectDragGestures(onDragStart={dx=0f;dy=0f},onDrag={change,drag ->
+            change.consume();dx+=drag.x;dy+=drag.y
+            if(mode.resize && max(abs(dx),abs(dy))>72f) {
+                val values=listOf("Compact","Standard","Large"); val at=values.indexOf(state.config.sizes[kind]?:"Standard")
+                model.resizeWidget(kind,values[(at+if(dx+dy>0)1 else -1).coerceIn(0,values.lastIndex)]);dx=0f;dy=0f
+            } else if(!mode.resize && abs(dy)>72f) {
+                val direction=if(dy>0)1 else -1
+                if(mode.plan)model.movePlanWidget(kind,direction) else if(mode.space)model.moveSpaceWidget(kind,direction) else model.moveWidget(kind,direction)
+                dy=0f
+            }
+        })
     }
 }
 

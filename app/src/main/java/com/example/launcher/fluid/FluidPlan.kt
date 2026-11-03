@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.*
         FluidHeading("Plan",fluidDate(state.now,"EEEE, MMM d"))
         state.config.planWidgets.forEachIndexed { index,kind ->
             val edit=LocalWidgetEdit.current
-            Column(Modifier.fillMaxWidth().glass(30.dp,kind==FluidWidget.AGENDA).combinedClickable(onLongClick={edit(kind)},onClick={}).padding(20.dp)) {
+            Column(Modifier.fillMaxWidth().glass(30.dp,kind==FluidWidget.AGENDA).widgetGesture(kind,state,model).combinedClickable(onLongClick={edit(kind)},onClick={if(kind==FluidWidget.AGENDA) model.open(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR)) else {}}).padding(20.dp)) {
                 if(kind==FluidWidget.TASKS) Text("Tasks",style=F.text(11,muted=true),modifier=Modifier.padding(bottom=10.dp))
                 WidgetBody(kind,state,model,calendarAccess=calendarAccess)
             }

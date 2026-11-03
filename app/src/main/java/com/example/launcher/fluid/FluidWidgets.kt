@@ -38,13 +38,11 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
     }
 }
 
-@Composable fun MusicOrb(state: FluidState, play: () -> Unit, expand: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false, framed: Boolean = true) {
+@Composable fun MusicOrb(state: FluidState, play: () -> Unit, previous: () -> Unit, next: () -> Unit, expand: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false, framed: Boolean = true) {
     val motion=rememberInfiniteTransition(label="Music artwork motion")
     val rotation by motion.animateFloat(0f,360f,infiniteRepeatable(tween(18_000,easing=LinearEasing)),label="Record rotation")
-    val orbit by motion.animateFloat(0f,360f,infiniteRepeatable(tween(7_500,easing=LinearEasing)),label="Artwork orbit")
     val active=state.device.playing
     val accentColor=F.purple
-    val artworkShift=if(active) 4.dp else 0.dp
     val container=if(framed) Modifier.glass(70.dp) else Modifier
     Column(modifier, horizontalAlignment=Alignment.CenterHorizontally) {
         Box(Modifier.size(if(compact)104.dp else 132.dp).then(container).clickable(onClick=expand),contentAlignment=Alignment.Center) {
@@ -57,19 +55,23 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                     if(active) drawArc(accentColor,start,120f,false,style=accent)
                 }
             }
-            val radians=Math.toRadians(orbit.toDouble())
-            Canvas(Modifier.size(if(compact)60.dp else 78.dp).offset((cos(radians).toFloat()*artworkShift.value).dp,(sin(radians).toFloat()*artworkShift.value).dp).clip(CircleShape).rotate(if(active)rotation else 0f)) {
+            val artSize=if(compact)60.dp else 78.dp
+            Box(Modifier.size(artSize).clip(CircleShape).rotate(if(active)rotation else 0f),contentAlignment=Alignment.Center) {
+                state.device.mediaArtwork?.let { artwork -> Image(artwork.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop) } ?: Canvas(Modifier.fillMaxSize()) {
                 // A compact album-art illustration, kept inside a circular record as it orbits and rotates.
                 drawCircle(Brush.radialGradient(listOf(Color(0xFFDCCFFF),Color(0xFF7051C5),Color(0xFF33215F))))
                 val wave=Path().apply { moveTo(-size.width*.1f,size.height*.62f);cubicTo(size.width*.2f,size.height*.32f,size.width*.48f,size.height*.86f,size.width*1.08f,size.height*.34f);lineTo(size.width*1.1f,size.height*1.1f);lineTo(-size.width*.1f,size.height*1.1f);close() }
                 drawPath(wave,Brush.linearGradient(listOf(Color(0xFFEBCBFF),Color(0xFF8F72E8),Color(0xFF4B2F92))))
                 drawCircle(Color.White.copy(alpha=.22f),size.minDimension*.13f,Offset(size.width*.26f,size.height*.25f))
                 repeat(3) { i -> drawCircle(Color.White.copy(alpha=.13f),size.minDimension*(.18f+i*.12f),style=Stroke(.8.dp.toPx())) }
+                }
             }
             Text(if(active) "PLAYING" else "MUSIC",style=F.text(8,true),modifier=Modifier.align(Alignment.TopCenter).padding(top=9.dp))
             Box(Modifier.align(Alignment.BottomCenter).size(40.dp).testTag("music-play").clip(CircleShape).clickable(role=Role.Button,onClick=play).semantics { contentDescription=if(state.device.playing) "Pause music" else "Play music" },contentAlignment=Alignment.Center) {
                 Box(Modifier.size(24.dp).clip(CircleShape).background(F.purple),contentAlignment=Alignment.Center) { Glyph(if(active) "pause" else "play",Color.White,Modifier.size(12.dp)) }
             }
+            GlassIcon("previous","Previous track",Modifier.align(Alignment.CenterStart).size(28.dp),onClick=previous)
+            GlassIcon("next","Next track",Modifier.align(Alignment.CenterEnd).size(28.dp),onClick=next)
         }
         Text(state.device.mediaTitle ?: "Music",style=F.text(11),maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.padding(top=7.dp).widthIn(max=140.dp))
     }
@@ -125,13 +127,14 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                 var city by remember(state.config.city) { mutableStateOf(state.config.city) }
                 Spacer(Modifier.height(18.dp)); FluidField(city,"City",{city=it})
                 GlassButton(if(state.weatherLoading) "Refreshing…" else "Update weather",Modifier.padding(top=12.dp),primary=true) { model.weatherCity(city) }
+                GlassButton("Cycle animation",Modifier.padding(top=10.dp),glyph="next") { model.cycleWeatherPreview() }
                 state.weatherError?.let { Text(it,style=F.text(12,muted=true),modifier=Modifier.padding(top=12.dp)) }
                 state.weather?.hours?.forEach { hour -> Row(Modifier.fillMaxWidth().padding(top=18.dp),horizontalArrangement=Arrangement.SpaceBetween) { Text(hour.time,style=F.text()); Text("${hour.temperature.roundToInt()}°",style=F.text(14,true)) } }
                 Text("Open-Meteo · live forecast",style=F.text(10,muted=true),modifier=Modifier.padding(top=20.dp))
             }
         }
         FluidWidget.MUSIC, FluidWidget.MUSIC_OPEN -> {
-            MusicOrb(state,{model.media("play")},{},Modifier.fillMaxWidth(),compact=compact,framed=kind==FluidWidget.MUSIC)
+            MusicOrb(state,{model.media("play")},{model.media("previous")},{model.media("next")},{},Modifier.fillMaxWidth(),compact=compact,framed=kind==FluidWidget.MUSIC)
             if(detail) {
                 Text(state.device.mediaTitle ?: "Nothing playing yet",style=F.text(20,true),modifier=Modifier.padding(top=24.dp))
                 Text(if(state.device.mediaAccess) "Start music in your favorite app." else "Connect notification access to control your music.",style=F.text(13,muted=true),modifier=Modifier.padding(top=8.dp))

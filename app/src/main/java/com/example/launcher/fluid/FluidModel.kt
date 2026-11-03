@@ -48,7 +48,7 @@ data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<In
     val device: DeviceState = DeviceState(), val now: Long = System.currentTimeMillis(), val homeEpoch: Int = 0, val wallpaperApplying:Boolean=false,
     val tasks: List<FluidTask> = emptyList(), val weather: HomeWeather? = null, val weatherLoading: Boolean = false,
     val weatherError: String? = null, val storageUsed: Long = 0, val storageTotal: Long = 1, val message: String? = null,
-    val steps: Int? = null)
+    val steps: Int? = null, val weatherPreview: Int = 0)
 
 class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.SensorEventListener {
     private val prefs = app.getSharedPreferences("fluid_launcher_v1", 0)
@@ -143,6 +143,10 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         val list = c.widgets.toMutableList(); val from = list.indexOf(widget); val to = (from + delta).coerceIn(0, (list.size - 1).coerceAtLeast(0))
         if (from >= 0) { list.removeAt(from); list.add(to, widget) }; c.copy(widgets = list)
     }
+    fun moveSpaceWidget(widget: FluidWidget, delta: Int) = configure { c ->
+        val list = c.spaceWidgets.toMutableList(); val from = list.indexOf(widget); val to = (from + delta).coerceIn(0, (list.size - 1).coerceAtLeast(0))
+        if (from >= 0) { list.removeAt(from); list.add(to, widget) }; c.copy(spaceWidgets = list)
+    }
     fun assign(app: InstalledApp, space: String) = configure { c ->
         val key = app.component.flattenToString()
         c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key, tools=if(space=="Tools")c.tools+key else c.tools-key)
@@ -208,6 +212,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         prefs.edit().putString("tasks", JSONArray(tasks.map { JSONObject().put("id", it.id).put("text", it.text).put("done", it.done) }).toString()).apply()
     }
     fun weatherCity(city: String) { if (city.isBlank()) return; configure { it.copy(city = city.trim(),autoWeather=false) }; refreshWeather(true) }
+    fun cycleWeatherPreview() { mutable.update { it.copy(weatherPreview = (it.weatherPreview + 1) % 7) } }
     fun useWeatherLocation() { configure { it.copy(autoWeather=true) };refreshWeather(true) }
     fun refreshWeather(force: Boolean=false) {
         if(weatherJob?.isActive==true && !force)return

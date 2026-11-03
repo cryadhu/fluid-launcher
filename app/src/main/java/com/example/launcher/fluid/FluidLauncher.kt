@@ -66,6 +66,10 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     var widgetEditSpace by remember { mutableStateOf(false) }
     var widgetEditPlan by remember { mutableStateOf(false) }
     var widgetEdit by remember { mutableStateOf<FluidWidget?>(null) }
+    var gestureWidget by remember { mutableStateOf<FluidWidget?>(null) }
+    var gestureResize by remember { mutableStateOf(false) }
+    var gestureSpace by remember { mutableStateOf(false) }
+    var gesturePlan by remember { mutableStateOf(false) }
     var dockDragging by remember { mutableStateOf(false) }
     var drawer by remember { mutableStateOf(false) }
     var drawerGesture by remember { mutableStateOf<Float?>(null) }
@@ -128,7 +132,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { widgetEditSpace=state.config.pages.getOrNull(pager.currentPage)=="Space";widgetEditPlan=state.config.pages.getOrNull(pager.currentPage)=="Plan";widgetEdit=it }) {
+    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetGestureMode provides WidgetGestureMode(gestureWidget,gestureResize,gestureSpace,gesturePlan),LocalWidgetEdit provides { widgetEditSpace=state.config.pages.getOrNull(pager.currentPage)=="Space";widgetEditPlan=state.config.pages.getOrNull(pager.currentPage)=="Plan";widgetEdit=it }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
@@ -165,7 +169,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
         AnimatedVisibility(appMenu!=null,enter=fadeIn(tween(110))+scaleIn(spring(.75f,450f),initialScale=.9f),exit=fadeOut(tween(100))+scaleOut(tween(130),targetScale=.96f)) {
             appMenu?.let { app -> FluidAppOptions(app,state,model,{appMenu=null}) }
         }
-        widgetEdit?.let { WidgetEditSheet(it,state,model,space=widgetEditSpace,plan=widgetEditPlan) { widgetEdit=null } }
+        widgetEdit?.let { selected -> WidgetEditSheet(selected,state,model,space=widgetEditSpace,plan=widgetEditPlan,arrange={gestureWidget=selected;gestureResize=false;gestureSpace=widgetEditSpace;gesturePlan=widgetEditPlan},resize={gestureWidget=selected;gestureResize=true;gestureSpace=widgetEditSpace;gesturePlan=widgetEditPlan}) { widgetEdit=null } }
         launching?.let { AppLaunchBloom(it,launchRect,sceneSize) }
         AnimatedVisibility(state.message!=null,Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal=20.dp,vertical=68.dp),enter=fadeIn()+slideInVertically{it/2},exit=fadeOut()) {
             Text(state.message.orEmpty(),style=F.text(13),modifier=Modifier.glass(24.dp,true).padding(horizontal=20.dp,vertical=14.dp))
