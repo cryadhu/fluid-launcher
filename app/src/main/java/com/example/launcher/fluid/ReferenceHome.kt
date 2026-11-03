@@ -185,23 +185,43 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     }
 }
 
+/** Full-screen, grid-based resize surface.  The corner/edge handles and preview deliberately mirror
+ * the home layout so changing size never feels like a disconnected setting. */
+@Composable internal fun WidgetResizeEditor(kind:FluidWidget,state:FluidState,model:FluidModel,space:Boolean=false,plan:Boolean=false,done:()->Unit) {
+    val size=state.config.sizes[kind] ?: "Standard"
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=.13f)).statusBarsPadding().navigationBarsPadding().padding(18.dp)) {
+        Column(Modifier.fillMaxSize().glass(30.dp,true).padding(20.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)){Text("Resize widget",style=F.text(23,true));Text("Drag a handle · snaps to the grid",style=F.text(12,muted=true))};GlassButton("Done",glyph="check",primary=true,onClick=done) }
+            val previewHeight=when(size){"Compact"->150.dp;"Large"->280.dp;else->215.dp}
+            Box(Modifier.fillMaxWidth().height(previewHeight).padding(8.dp).border(2.dp,F.purple,RoundedCornerShape(26.dp)).pointerInput(size){
+                var distance=0f; detectDragGestures(onDragStart={distance=0f},onDrag={change,drag->change.consume();distance+=drag.x+drag.y;if(abs(distance)>70f){val choices=listOf("Compact","Standard","Large");val at=choices.indexOf(size);model.resizeWidget(kind,choices[(at+if(distance>0)1 else -1).coerceIn(0,choices.lastIndex)]);distance=0f}})
+            },contentAlignment=Alignment.Center) {
+                Box(Modifier.align(Alignment.TopCenter).offset(y=(-6).dp).width(28.dp).height(6.dp).clip(CircleShape).background(F.purple))
+                Box(Modifier.align(Alignment.CenterStart).offset(x=(-6).dp).width(6.dp).height(28.dp).clip(CircleShape).background(F.purple))
+                Box(Modifier.align(Alignment.CenterEnd).offset(x=6.dp).width(6.dp).height(28.dp).clip(CircleShape).background(F.purple))
+                listOf(Alignment.TopStart,Alignment.TopEnd,Alignment.BottomStart,Alignment.BottomEnd).forEach { alignment -> Box(Modifier.align(alignment).offset(if(alignment==Alignment.TopStart||alignment==Alignment.BottomStart)(-7).dp else 7.dp,if(alignment==Alignment.TopStart||alignment==Alignment.TopEnd)(-7).dp else 7.dp).size(14.dp).clip(CircleShape).background(Color.White).border(2.dp,F.purple,CircleShape)) }
+                Column(horizontalAlignment=Alignment.CenterHorizontally){ Glyph(kind.glyph,F.purple,Modifier.size(30.dp));Text(kind.title,style=F.text(18,true));Text(size,style=F.text(12,muted=true)) }
+            }
+            Text("Widget size",style=F.text(14,true));WidgetSizeOptions(size){model.resizeWidget(kind,it)}
+            Text("Use the handles to stretch the widget. The launcher snaps it to the nearest available grid size.",style=F.text(11,muted=true))
+            GlassButton("Remove widget",Modifier.fillMaxWidth(),glyph="bin"){ if(plan)model.togglePlanWidget(kind) else if(space)model.removeSpaceWidget(kind) else model.toggleWidget(kind);done() }
+        }
+    }
+}
+
 @Composable internal fun Modifier.widgetGesture(kind:FluidWidget,state:FluidState,model:FluidModel):Modifier {
     val mode=LocalWidgetGestureMode.current
     if(mode.widget!=kind)return this
-    return pointerInput(kind,mode.resize,mode.space,mode.plan) {
-        var dx=0f; var dy=0f
-        detectDragGestures(onDragStart={dx=0f;dy=0f},onDrag={change,drag ->
-            change.consume();dx+=drag.x;dy+=drag.y
-            if(mode.resize && max(abs(dx),abs(dy))>72f) {
-                val values=listOf("Compact","Standard","Large"); val at=values.indexOf(state.config.sizes[kind]?:"Standard")
-                model.resizeWidget(kind,values[(at+if(dx+dy>0)1 else -1).coerceIn(0,values.lastIndex)]);dx=0f;dy=0f
-            } else if(!mode.resize && abs(dy)>72f) {
-                val direction=if(dy>0)1 else -1
-                if(mode.plan)model.movePlanWidget(kind,direction) else if(mode.space)model.moveSpaceWidget(kind,direction) else model.moveWidget(kind,direction)
-                dy=0f
-            }
-        })
-    }
+    var dragging by remember(kind) { mutableStateOf(false) }; var x by remember(kind){mutableFloatStateOf(0f)};var y by remember(kind){mutableFloatStateOf(0f)}
+    val phase by rememberInfiniteTransition(label="Arrange wobble").animateFloat(0f,6.283f,infiniteRepeatable(tween(460,easing=LinearEasing)),label="Wobble phase")
+    return graphicsLayer { translationX=x;translationY=y;rotationZ=if(dragging)0f else sin(phase)*1.45f;scaleX=if(dragging)1.035f else 1f;scaleY=if(dragging)1.035f else 1f;shadowElevation=if(dragging)16.dp.toPx() else 0f }
+        .pointerInput(kind,mode.space,mode.plan) {
+            var swapped=0f
+            detectDragGestures(onDragStart={dragging=true;x=0f;y=0f;swapped=0f},onDragCancel={dragging=false;x=0f;y=0f},onDragEnd={dragging=false;x=0f;y=0f},onDrag={change,drag ->
+                change.consume();x+=drag.x;y+=drag.y;swapped+=drag.y
+                if(abs(swapped)>70f) { val direction=if(swapped>0)1 else -1;if(mode.plan)model.movePlanWidget(kind,direction)else if(mode.space)model.moveSpaceWidget(kind,direction)else model.moveWidget(kind,direction);swapped=0f;y=0f }
+            })
+        }
 }
 
 @Composable internal fun WidgetSizeOptions(selected:String,select:(String)->Unit) {
