@@ -15,6 +15,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.grid.*
@@ -38,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.launcher.data.*
 import com.example.launcher.ui.Glyph
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlin.math.*
 
 internal const val HOME_PAGE=1
@@ -67,8 +69,37 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     var widgetEditPage by rememberSaveable { mutableStateOf("Home") }
     var pageEdit by remember { mutableStateOf<String?>(null) }
     val pageEdits=remember { mutableStateMapOf<String,PageEdit>() }
-    fun editFor(page:String)=pageEdits.getOrPut(page) { PageEdit(page,model,scope){pageEdit=page} }
-    val edit=pageEdit?.let { pageEdits[it] }
+    fun editFor(page:String):PageEdit = pageEdits.getOrPut(page) {
+        lateinit var created:PageEdit
+        created = PageEdit(page,model,scope,
+            onActivated = {
+                pageEdits.values.filter { it !== created }.forEach { it.close() }
+                pageEdit = page
+            },
+            onPageDropped = { target ->
+                scope.launch {
+                    val index = model.state.value.config.pages.indexOf(target)
+                    if (index >= 0) {
+                        snapshotFlow { pager.pageCount }.first { it > index }
+                        pager.animateScrollToPage(index, animationSpec = spring(.9f, 320f))
+                    }
+                    pageEdits.values.filter { it.page != target }.forEach { it.close() }
+                    pageEdit = target
+                    editFor(target).enter()
+                }
+            })
+        created
+    }
+    val activeEdit = pageEdits.values.firstOrNull { it.active }
+    val editing = activeEdit != null
+    val editBlur by animateDpAsState(if (editing) 7.dp else 0.dp, spring(1f, 300f), label = "Edit backdrop")
+    LaunchedEffect(pager.settledPage) {
+        val current = pageEdits.values.firstOrNull { it.active } ?: return@LaunchedEffect
+        val settled = model.state.value.config.pages.getOrNull(pager.settledPage) ?: return@LaunchedEffect
+        if (settled == current.page) return@LaunchedEffect
+        current.close()
+        if (pageSupportsWidgets(settled)) { editFor(settled).enter(); pageEdit = settled } else pageEdit = null
+    }
     var resizeEditor by remember { mutableStateOf<FluidWidget?>(null) }
     var dockDragging by remember { mutableStateOf(false) }
     var drawer by remember { mutableStateOf(false) }
@@ -126,14 +157,14 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
         scope.launch { delay(170); model.launch(app); delay(260); launching=null; drawer=false; search=""; pager.scrollToPage(HOME_PAGE) }
     }
     val finishPageEdit:()->Unit = {
-        val current=pageEdit
-        if(current!=null) {
-            edit?.close()
-            scope.launch { delay(230); if(pageEdit==current) pageEdit=null }
+        val open = pageEdits.values.filter { it.active }
+        if (open.isNotEmpty()) {
+            open.forEach { it.close() }
+            scope.launch { delay(230); pageEdit=null }
         }
     }
     var handledHomeEpoch by rememberSaveable { mutableIntStateOf(state.homeEpoch) }
-    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0 && state.homeEpoch!=handledHomeEpoch) { handledHomeEpoch=state.homeEpoch; drawerGesture=null; widgetEdit=null; edit?.close(); pageEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.9f,320f)) } }
+    LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0 && state.homeEpoch!=handledHomeEpoch) { handledHomeEpoch=state.homeEpoch; drawerGesture=null; widgetEdit=null; pageEdits.values.forEach{it.close()}; pageEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.9f,320f)) } }
     BackHandler {
         when { pageEdit!=null -> finishPageEdit(); resizeEditor!=null -> resizeEditor=null; widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panelBack(); drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
     }
@@ -141,22 +172,28 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
     CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
-        FluidWallpaper()
-        Box(Modifier.fillMaxSize().blur(panelBlur)) {
+        FluidWallpaper(Modifier.blur(editBlur))
+        Box(Modifier.fillMaxSize().blur(panelBlur + editBlur)) {
             HorizontalPager(pager,Modifier.fillMaxSize().graphicsLayer { scaleX=1f-drawerProgress*.055f; scaleY=scaleX; alpha=1f-drawerProgress*.48f }.blur((drawerProgress*18).dp)
-                .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null && pageEdit==null) { index ->
+                .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null && pageEdits.values.none{it.dragging!=null}) { index ->
                 val distance = ((pager.currentPage-index)+pager.currentPageOffsetFraction).absoluteValue.coerceAtMost(1f)
                 val currentPage=state.config.pages[index]
-                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(onClick={},onLongClick={if(pageEdits.values.none{it.active})showPanel("Customize:$currentPage")})) {
+                val pagePress=remember { MutableInteractionSource() }
+                val pressed by pagePress.collectIsPressedAsState()
+                val highlight by animateFloatAsState(if(pressed)1f else 0f,spring(1f,500f),label="Page press")
+                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(interactionSource=pagePress,indication=null,onClick={},onLongClick={if(pageEdits.values.none{it.active})showPanel("Customize:$currentPage")})) {
+                    // The page-level press highlight is deliberately edge-to-edge; the inner
+                    // content clickables suppress their own inset ripples.
+                    if(highlight>.001f && !editing) Box(Modifier.matchParentSize().graphicsLayer { alpha=highlight }.background(F.ink.copy(alpha=.12f)))
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
                     val pageState=editFor(currentPage)
-                    CompositionLocalProvider(LocalPageEdit provides pageState) {
+                    CompositionLocalProvider(LocalPageEdit provides pageState,LocalPagePress provides pagePress) {
                         when(state.config.pages[index]) {
-                            "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize:Home")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch,pageState,finishPageEdit)
-                            "Space" -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch,pageState,finishPageEdit)
-                            "Plan" -> FluidPlan(state,model,padding,calendarAccess,pageState,finishPageEdit)
+                            "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize:Home")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch,pageState)
+                            "Space" -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch,pageState)
+                            "Plan" -> FluidPlan(state,model,padding,calendarAccess,pageState)
                             "Markets" -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
-                            else -> FluidCustomPage(currentPage,state,model,hero,padding,calendarAccess,activityAccess,pageState,finishPageEdit)
+                            else -> FluidCustomPage(currentPage,state,model,hero,padding,calendarAccess,activityAccess,pageState)
                         }
                     }
                 }
@@ -170,6 +207,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
             }
         }
         FluidHeroOverlay(hero,state,model,calendarAccess,activityAccess)
+        activeEdit?.let { PageEditOverlay(it,finishPageEdit) }
         AnimatedVisibility(panel!=null,enter=fadeIn(spring(stiffness=350f))+slideInVertically(spring(.9f,350f)){it/6},exit=fadeOut(tween(180))+slideOutVertically(tween(240)){it/5}) {
             AnimatedContent(targetState=panel ?: lastPanel,transitionSpec={
                 (fadeIn(tween(210))+slideInHorizontally(spring(.95f,350f)){it/10}) togetherWith (fadeOut(tween(130))+slideOutHorizontally(tween(190)){-it/16})
@@ -180,7 +218,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
         AnimatedVisibility(appMenu!=null,enter=fadeIn(tween(110))+scaleIn(spring(.75f,450f),initialScale=.9f),exit=fadeOut(tween(100))+scaleOut(tween(130),targetScale=.96f)) {
             appMenu?.let { app -> FluidAppOptions(app,state,model,{appMenu=null}) }
         }
-        widgetEdit?.let { selected -> WidgetEditSheet(selected,page=widgetEditPage,state,model,arrange={pageEdit=widgetEditPage},resize={resizeEditor=selected}) { widgetEdit=null } }
+        widgetEdit?.let { selected -> WidgetEditSheet(selected,page=widgetEditPage,state,model,arrange={ editFor(widgetEditPage).enter(); pageEdit=widgetEditPage },resize={resizeEditor=selected}) { widgetEdit=null } }
         resizeEditor?.let { selected -> WidgetResizeEditor(selected,state,model,page=widgetEditPage){resizeEditor=null} }
         launching?.let { AppLaunchBloom(it,launchRect,sceneSize) }
         AnimatedVisibility(state.message!=null,Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal=20.dp,vertical=68.dp),enter=fadeIn()+slideInVertically{it/2},exit=fadeOut()) {
@@ -238,7 +276,7 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     }
 }
 
-@Composable private fun FluidSpace(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,manage:()->Unit,launch:(InstalledApp,Rect)->Unit,edit:PageEdit?=null,finishEdit:()->Unit={}) {
+@Composable private fun FluidSpace(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,manage:()->Unit,launch:(InstalledApp,Rect)->Unit,edit:PageEdit?=null) {
     var selected by rememberSaveable { mutableStateOf("Work") }
     val tabs=listOf("Work","Personal","Tools")
     val apps=fluidFilteredApps(state.apps,state.config,"",selected)
@@ -271,11 +309,10 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
             val openGallery=LocalSpaceWidgetGallery.current
             if(edit?.active!=true) GlassButton("Add widgets",Modifier.fillMaxWidth(),glyph="plus",onClick=openGallery)
         }
-        edit?.let { PageEditOverlay(it,finishEdit) }
     }
 }
 
-@Composable internal fun FluidCustomPage(page:String,state:FluidState,model:FluidModel,hero:FluidHero,modifier:Modifier,calendar:()->Unit,activity:()->Unit,edit:PageEdit?=null,finishEdit:()->Unit={}) {
+@Composable internal fun FluidCustomPage(page:String,state:FluidState,model:FluidModel,hero:FluidHero,modifier:Modifier,calendar:()->Unit,activity:()->Unit,edit:PageEdit?=null) {
     val widgets=model.widgetsForPage(page)
     val scroll=rememberScrollState()
     val density=LocalDensity.current
@@ -292,6 +329,5 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
                 }
             } }
         }
-        edit?.let { PageEditOverlay(it,finishEdit) }
     }
 }

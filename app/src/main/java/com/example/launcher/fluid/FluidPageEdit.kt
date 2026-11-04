@@ -13,11 +13,14 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -37,12 +40,18 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.sin
+
+/** A page that can receive a dragged widget. [page] is null when the drag targets a new page. */
+internal data class PageDrop(val page: String?, val direction: Int, val create: Boolean)
+
+internal fun pageSupportsWidgets(page: String) = page != "Markets"
 
 /** In-page rearrangement state. Widget cards stay in the real page layout, the dragged card
  * follows the finger, and every displaced card is FLIP-animated into its new slot. */
 @Stable
-internal class PageEdit(val page: String, private val model: FluidModel, private val scope: kotlinx.coroutines.CoroutineScope, private val onActivated: () -> Unit = {}) {
+internal class PageEdit(val page: String, private val model: FluidModel, private val scope: kotlinx.coroutines.CoroutineScope, private val onActivated: () -> Unit = {}, private val onPageDropped: (String) -> Unit = {}) {
     var active by mutableStateOf(false)
         private set
     var dragging by mutableStateOf<FluidWidget?>(null)
@@ -58,6 +67,8 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
     val removeProgress = Animatable(1f)
     var overRemove by mutableStateOf(false)
         private set
+    var dropTarget by mutableStateOf<PageDrop?>(null)
+        private set
     var removeBounds by mutableStateOf(Rect.Zero)
     var viewport by mutableStateOf(Rect.Zero)
     val heights = mutableStateMapOf<FluidWidget, Float>()
@@ -72,11 +83,19 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
     private var pointer = Offset.Zero
     private var autoScroll: Job? = null
     private var autoDirection = 0
+    private var edgeJob: Job? = null
+    private var edgeCandidate: PageDrop? = null
 
     fun bind(widgets: List<FluidWidget>, spacing: Float, scrollState: ScrollState) {
         visible = widgets
         spacingPx = spacing
         scroll = scrollState
+    }
+
+    fun enter() {
+        if (active) return
+        active = true
+        onActivated()
     }
 
     fun activate(kind: FluidWidget, local: Offset) {
@@ -88,6 +107,7 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
     fun begin(kind: FluidWidget, local: Offset) {
         if (!active || removing != null) return
         stopAutoScroll()
+        cancelEdge()
         // Re-grabbing a card while it is still settling starts from the position the
         // user can see, so the card never jumps back to its slot under the finger.
         val carrying = if (settling == kind) settle?.value ?: Offset.Zero else Offset.Zero
@@ -111,14 +131,29 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
         overRemove = removeBounds.width > 0f && removeBounds.contains(pointer)
         maybeSwap(kind)
         autoScrollIfNeeded()
+        updatePageDrop()
     }
 
     fun end() {
         stopAutoScroll()
         val kind = dragging ?: return
+        val drop = dropTarget
+        cancelEdge()
         dragging = null
         if (overRemove) {
             remove(kind)
+            return
+        }
+        if (drop != null) {
+            val target = drop.page ?: model.addPage()
+            model.moveWidgetToPage(page, target, kind)
+            flipJobs.remove(kind)?.cancel()
+            heights.remove(kind)
+            cards.remove(kind)
+            flips.remove(kind)
+            drag = Offset.Zero
+            overRemove = false
+            onPageDropped(target)
             return
         }
         val anim = Animatable(drag, Offset.VectorConverter)
@@ -136,6 +171,7 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
     fun close() {
         if (!active) return
         stopAutoScroll()
+        cancelEdge()
         settleJob?.cancel()
         settleJob = null
         active = false
@@ -253,6 +289,51 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
         autoScroll?.cancel()
         autoScroll = null
     }
+
+    /** Only a deliberate sideways drag can arm a page drop, so grabbing a card near an edge
+     * never steals a normal vertical reorder. The dwell keeps the hint from flashing by. */
+    private fun updatePageDrop() {
+        val next = if (overRemove) null else computePageDrop()
+        if (next == edgeCandidate) return
+        edgeCandidate = next
+        edgeJob?.cancel()
+        edgeJob = null
+        if (next == null) { dropTarget = null; return }
+        edgeJob = scope.launch {
+            delay(300)
+            if (edgeCandidate == next) dropTarget = next
+        }
+    }
+
+    private fun computePageDrop(): PageDrop? {
+        val vp = viewport
+        if (vp.width <= 0f) return null
+        if (abs(drag.x) < vp.width * .065f) return null
+        val zone = vp.width * .16f
+        val pages = model.state.value.config.pages
+        val index = pages.indexOf(page)
+        if (index < 0) return null
+        if (drag.x < 0f && pointer.x <= vp.left + zone) {
+            val previous = pages.getOrNull(index - 1)?.takeIf(::pageSupportsWidgets) ?: return null
+            return PageDrop(previous, -1, false)
+        }
+        if (drag.x > 0f && pointer.x >= vp.right - zone) {
+            val next = pages.getOrNull(index + 1)
+            return when {
+                next == null -> PageDrop(null, 1, true)
+                pageSupportsWidgets(next) -> PageDrop(next, 1, false)
+                else -> null
+            }
+        }
+        return null
+    }
+
+    private fun cancelEdge() {
+        edgeJob?.cancel()
+        edgeJob = null
+        edgeCandidate = null
+        dropTarget = null
+    }
 }
 
 /** Lift, FLIP offsets and per-card measurement all live here so the page keeps its layout. */
@@ -346,7 +427,7 @@ internal fun Modifier.pageEditDrag(kind: FluidWidget, edit: PageEdit): Modifier 
 internal fun BoxScope.PageEditOverlay(edit: PageEdit, onDone: () -> Unit) {
     AnimatedVisibility(
         visible = edit.active,
-        modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+        modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 10.dp, vertical = 8.dp),
         enter = slideInVertically(spring(dampingRatio = .8f, stiffness = 360f)) { -it / 2 } + fadeIn(tween(140)),
         exit = slideOutVertically(tween(180)) { -it / 2 } + fadeOut(tween(120))
     ) {
@@ -357,32 +438,64 @@ internal fun BoxScope.PageEditOverlay(edit: PageEdit, onDone: () -> Unit) {
     }
     AnimatedVisibility(
         visible = edit.active,
-        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 2.dp, vertical = 6.dp),
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 42.dp),
         enter = slideInVertically(spring(dampingRatio = .8f, stiffness = 360f)) { it } + fadeIn(tween(140)),
         exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(120))
     ) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            val hot = edit.overRemove
-            Box(
-                Modifier.fillMaxWidth().height(68.dp)
-                    .onGloballyPositioned { edit.removeBounds = it.boundsInRoot() }
-                    .graphicsLayer {
-                        val scale = if (hot) 1.015f else 1f
-                        scaleX = scale
-                        scaleY = scale
-                    }
-                    .glass(24.dp, true)
-                    .background(Color(0xFFE05B67).copy(alpha = if (hot) .24f else .11f), RoundedCornerShape(24.dp))
-                    .border(if (hot) 2.5.dp else 1.5.dp, Color(0xFFE05B67).copy(alpha = if (hot) 1f else .65f), RoundedCornerShape(24.dp))
-                    .testTag("widget-remove-target")
-                    .semantics { stateDescription = if (hot) "Ready to remove" else "Drag here to remove" },
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Glyph("bin", Color(0xFFE05B67), Modifier.size(24.dp))
-                    Text(if (hot) "Release to remove" else "Drag here to remove", style = F.text(15, true), color = Color(0xFFE05B67), modifier = Modifier.padding(start = 10.dp))
+        val hot = edit.overRemove
+        Box(
+            Modifier.fillMaxWidth().height(62.dp)
+                .onGloballyPositioned { edit.removeBounds = it.boundsInRoot() }
+                .graphicsLayer {
+                    val scale = if (hot) 1.015f else 1f
+                    scaleX = scale
+                    scaleY = scale
                 }
+                .glass(24.dp, true)
+                .background(Color(0xFFE05B67).copy(alpha = if (hot) .24f else .11f), RoundedCornerShape(24.dp))
+                .border(if (hot) 2.5.dp else 1.5.dp, Color(0xFFE05B67).copy(alpha = if (hot) 1f else .65f), RoundedCornerShape(24.dp))
+                .testTag("widget-remove-target")
+                .semantics { stateDescription = if (hot) "Ready to remove" else "Drag here to remove" },
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Glyph("bin", Color(0xFFE05B67), Modifier.size(22.dp))
+                Text(if (hot) "Release to remove" else "Drag here to remove", style = F.text(14, true), color = Color(0xFFE05B67), modifier = Modifier.padding(start = 9.dp))
             }
+        }
+    }
+    val newPageDrop = edit.dropTarget?.takeIf { it.create }
+    AnimatedVisibility(
+        visible = edit.active && newPageDrop != null,
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(112.dp),
+        enter = fadeIn(tween(160)),
+        exit = fadeOut(tween(120))
+    ) {
+        Box(
+            Modifier.fillMaxSize()
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, F.purple.copy(alpha = .55f))))
+                .testTag("widget-new-page-target"),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            Column(Modifier.padding(end = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(F.purple), contentAlignment = Alignment.Center) {
+                    Glyph("plus", Color.White, Modifier.size(18.dp))
+                }
+                Text("New page", style = F.text(11, true), color = Color.White, modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+    }
+    val pageDrop = edit.dropTarget?.takeIf { !it.create }
+    AnimatedVisibility(
+        visible = edit.active && pageDrop != null,
+        modifier = Modifier.align(if (pageDrop?.direction == -1) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 12.dp),
+        enter = fadeIn(tween(160)),
+        exit = fadeOut(tween(120))
+    ) {
+        Row(Modifier.glass(24.dp, true).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (pageDrop?.direction == -1) Glyph("previous", F.purple, Modifier.size(16.dp))
+            Text(pageDrop?.page.orEmpty(), style = F.text(12, true), modifier = Modifier.padding(horizontal = 8.dp))
+            if (pageDrop?.direction == 1) Glyph("next", F.purple, Modifier.size(16.dp))
         }
     }
 }

@@ -489,3 +489,7 @@ Arrange now happens on the page itself instead of opening a separate screen. Eve
 ### v1.1.30 — Rearrange in one continuous press
 
 Holding a widget now starts the drag in the same gesture: the card follows the finger without lifting. Nested widget controls no longer swallow the move stream, and widget cards keep their identity while their order changes, so the active drag survives every swap. Releasing a card settles it into the slot under the finger with the spring animation instead of leaving it at the release position. Long-pressing the page while rearranging no longer opens a Customize panel over the editor, and the Customize home button stays available whenever the page is idle.
+
+### v1.1.31 — Moving widgets across pages
+
+The analog clock now derives each hand from the real hour, minute and second instead of a single angle, so it no longer sticks near twelve. Rearrange mode blurs and dims the page behind the editor, and the “Drag here to remove” bar sits directly above the page indicator. Swiping the page while rearranging carries the editor across to the newly settled page. Dragging a card past the left or right edge arms the adjacent page and drops the widget there; dragging toward the right edge of the last page reveals an accent gradient strip with a “New page” action that creates the page and moves the widget into it. The long-press highlight is now a full-bleed scrim drawn by the page itself, including the content area, instead of an inset ripple inside the padding.

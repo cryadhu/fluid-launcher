@@ -172,8 +172,23 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key, tools=if(space=="Tools")c.tools+key else c.tools-key)
     }
     fun toggleFavoriteApp(key:String) = configure { c -> c.copy(favoriteApps=if(key in c.favoriteApps)c.favoriteApps-key else c.favoriteApps+key) }
-    fun addPage()=configure { c -> c.copy(pages=c.pages+"Page ${(c.pages.count{it.startsWith("Page ")}+1)}") }
+    fun addPage(): String {
+        var name = ""
+        configure { c -> name = "Page ${(c.pages.count{it.startsWith("Page ")}+1)}"; c.copy(pages=c.pages+name) }
+        return name
+    }
     fun removePage(page:String)=configure { c -> if(page in listOf("Markets","Home"))c else c.copy(pages=c.pages-page) }
+    fun moveWidgetToPage(from:String,to:String,widget:FluidWidget,toFront:Boolean=true) {
+        if(from==to)return
+        fun FluidConfig.withPage(page:String,change:(List<FluidWidget>)->List<FluidWidget>):FluidConfig = when(page) {
+            "Home"->copy(widgets=change(widgets));"Space"->copy(spaceWidgets=change(spaceWidgets));"Plan"->copy(planWidgets=change(planWidgets))
+            else->copy(pageWidgets=pageWidgets+(page to change(pageWidgets[page].orEmpty())))
+        }
+        configure { c ->
+            val removed=c.withPage(from){ it.filterNot{w->w==widget} }
+            removed.withPage(to){ list -> (if(toFront) listOf(widget)+list else list+widget).distinct() }
+        }
+    }
     fun movePage(page:String,delta:Int)=configure { c -> val list=c.pages.toMutableList();val from=list.indexOf(page);val to=(from+delta).coerceIn(2,list.lastIndex);if(from>=2&&from!=to){list.removeAt(from);list.add(to,page)};c.copy(pages=list) }
     fun togglePlanWidget(widget:FluidWidget)=configure { c -> c.copy(planWidgets=if(widget in c.planWidgets)c.planWidgets-widget else c.planWidgets+widget) }
     fun movePlanWidget(widget:FluidWidget,delta:Int)=configure { c -> val list=c.planWidgets.toMutableList();val from=list.indexOf(widget);val to=(from+delta).coerceIn(0,(list.size-1).coerceAtLeast(0));if(from>=0){list.removeAt(from);list.add(to,widget)};c.copy(planWidgets=list) }

@@ -6,6 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
 import androidx.compose.material3.*
@@ -35,6 +36,8 @@ val LocalContactsAccess = staticCompositionLocalOf<()->Unit> { {} }
 val LocalSpaceWidgetGallery = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
 internal val LocalPageEdit = staticCompositionLocalOf<PageEdit?> { null }
+/** Shared with the page surface so content-level press anchors still light the full page. */
+internal val LocalPagePress = staticCompositionLocalOf<MutableInteractionSource?> { null }
 private data class WeatherPreview(val code:Int,val label:String,val day:Boolean,val wind:Double)
 internal fun weatherForDisplay(state:FluidState):HomeWeather? {
     if(state.weatherPreview==0)return state.weather
@@ -47,16 +50,21 @@ internal fun weatherForDisplay(state:FluidState):HomeWeather? {
 }
 internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==FluidWidget.BRIGHTNESS || kind==FluidWidget.VOLUME) when(config.sizes[kind]) { "Compact"->64.dp;"Large"->112.dp;else->80.dp } else when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
 
-@Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit,edit:PageEdit?=null,finishEdit:()->Unit={}) {
+@Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit,edit:PageEdit?=null) {
     val openEdit=LocalWidgetEdit.current
     val editable=state.config.widgets.filterNot{it==FluidWidget.CLOCK || it==FluidWidget.WEATHER || it in tinyControls}
     val scroll=rememberScrollState()
+    val pressSource=LocalPagePress.current
+    val ownPress=remember{MutableInteractionSource()}
     val density=LocalDensity.current
     val phase=rememberInfiniteTransition(label="Widget wobble").animateFloat(0f,6.2831855f,infiniteRepeatable(tween(900,easing=LinearEasing)),label="Wobble")
     SideEffect { edit?.bind(editable,with(density){14.dp.toPx()},scroll) }
     Box(modifier.navigationBarsPadding().padding(bottom=32.dp).onGloballyPositioned{edit?.viewport=it.boundsInRoot()}.testTag("fluid-home")) {
         Column(Modifier.fillMaxSize()) {
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).combinedClickable(onClick={},onLongClick={if(edit?.active!=true)customize()}).padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+            // Kept as a gesture/semantics anchor for the scroll container; its own ripple is
+            // suppressed because it is inset by the page padding. The page-level clickable in
+            // FluidLauncher draws the full-bleed highlight instead.
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).combinedClickable(interactionSource=pressSource ?: ownPress,indication=null,onClick={},onLongClick={if(edit?.active!=true)customize()}).padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
                     Text(fluidDate(state.now,"EEEE, MMM d"),style=F.text(12,muted=true),modifier=Modifier.testTag("fluid-home-date"))
                     if(edit?.active!=true) GlassIcon("edit","Customize home",Modifier.size(34.dp),onClick=customize) else Spacer(Modifier.size(34.dp))
@@ -89,7 +97,6 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
             }
             FluidDock(state, model, badges, ask, launch)
         }
-        edit?.let { PageEditOverlay(it,finishEdit) }
     }
 }
 
@@ -105,6 +112,10 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
         secondHand.animateTo(secondHand.value+delta,tween(850,easing=LinearEasing))
     }
     val seconds=secondHand.value
+    // Seconds are an angle, so fold them back into the real hour/minute positions
+    // instead of feeding the angle straight into every hand.
+    val minuteAngle=time.minute*6f+seconds/60f
+    val hourAngle=(time.hour%12)*30f+time.minute*.5f+seconds/720f
     val ink=F.ink
     val face=if(LocalGlass.current.dark)Color(0xFF35403D)else Color.White
     BoxWithConstraints(modifier.combinedClickable(onClick=click,onLongClick={edit(FluidWidget.CLOCK)}).semantics{contentDescription="Clock ${fluidDate(now,"HH:mm")}"},contentAlignment=Alignment.Center) {
@@ -116,8 +127,8 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                 drawLine(ink.copy(alpha=if(i%5==0).45f else .14f),center+Offset(cos(a).toFloat()*inner,sin(a).toFloat()*inner),center+Offset(cos(a).toFloat()*outer,sin(a).toFloat()*outer),if(i%5==0)1.3.dp.toPx()else .7.dp.toPx(),StrokeCap.Round)
             }
             fun hand(angle:Float,length:Float,width:Float,color:Color){val a=Math.toRadians(angle.toDouble()-90);drawLine(color,center,center+Offset(cos(a).toFloat()*radius*length,sin(a).toFloat()*radius*length),width.dp.toPx(),StrokeCap.Round)}
-            hand(seconds/720f,.46f,3f,ink)
-            hand(seconds/60f,.67f,2f,ink)
+            hand(hourAngle,.46f,3f,ink)
+            hand(minuteAngle,.67f,2f,ink)
             hand(seconds,.75f,.8f,Color(0xFFDF9279))
             drawCircle(ink,2.4.dp.toPx(),center)
         }

@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.*
 
 /** A focused daily page: agenda, tasks, shortcuts, and the people the user starred. */
-@Composable internal fun FluidPlan(state:FluidState,model:FluidModel,modifier:Modifier,calendarAccess:()->Unit,edit:PageEdit?=null,finishEdit:()->Unit={}) {
+@Composable internal fun FluidPlan(state:FluidState,model:FluidModel,modifier:Modifier,calendarAccess:()->Unit,edit:PageEdit?=null) {
     val openEdit=LocalWidgetEdit.current
     val pageEditor=LocalPageEdit.current
     val scroll=rememberScrollState()
@@ -39,6 +39,5 @@ import androidx.compose.ui.unit.*
                 }
             } }
         }
-        edit?.let { PageEditOverlay(it,finishEdit) }
     }
 }
