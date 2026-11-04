@@ -10,6 +10,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,8 +40,8 @@ import kotlin.math.sin
 /** In-page rearrangement state. Widget cards stay in the real page layout, the dragged card
  * follows the finger, and every displaced card is FLIP-animated into its new slot. */
 @Stable
-internal class PageEdit(val page: String, private val model: FluidModel, private val scope: kotlinx.coroutines.CoroutineScope) {
-    var active by mutableStateOf(true)
+internal class PageEdit(val page: String, private val model: FluidModel, private val scope: kotlinx.coroutines.CoroutineScope, private val onActivated: () -> Unit = {}) {
+    var active by mutableStateOf(false)
         private set
     var dragging by mutableStateOf<FluidWidget?>(null)
         private set
@@ -73,6 +74,12 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
         visible = widgets
         spacingPx = spacing
         scroll = scrollState
+    }
+
+    fun activate(kind: FluidWidget, local: Offset) {
+        if (active && dragging != null) return
+        if (!active) { active = true; onActivated() }
+        begin(kind, local)
     }
 
     fun begin(kind: FluidWidget, local: Offset) {
@@ -238,11 +245,27 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
 @Composable
 internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: State<Float>, index: Int): Modifier {
     if (edit == null) return this
+    val measured = this.onGloballyPositioned {
+        val height = it.size.height.toFloat()
+        if (edit.heights[kind] != height) edit.heights[kind] = height
+        if (edit.dragging != kind) {
+            val rect = it.boundsInRoot()
+            if (edit.cards[kind] != rect) edit.cards[kind] = rect
+        }
+    }
+    // The editor already exists before the finger lands, allowing the *same* long-press
+    // stream to transition into dragging instead of requiring a second touch.
+    if (!edit.active) return measured.pointerInput(kind) {
+        detectDragGesturesAfterLongPress(
+            onDragStart = { edit.activate(kind, it) },
+            onDragCancel = { edit.end() },
+            onDragEnd = { edit.end() },
+            onDrag = { change, amount -> change.consume(); edit.dragBy(amount) }
+        )
+    }
     val flip = edit.flips[kind]
     val settle = if (edit.settling == kind) edit.settle else null
-    return this
-        // Keep the card inboard of the scroll clip so its glass shadow is never cut off.
-        .padding(horizontal = 10.dp)
+    return measured
         .zIndex(if (edit.dragging == kind || edit.removing == kind) 2f else 0f)
         .graphicsLayer {
             val isDragging = edit.dragging == kind
@@ -263,14 +286,6 @@ internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: St
             scaleY = scale
             rotationZ = 0f
             alpha = if (removingThis) edit.removeProgress.value else 1f
-        }
-        .onGloballyPositioned {
-            val height = it.size.height.toFloat()
-            if (edit.heights[kind] != height) edit.heights[kind] = height
-            if (edit.dragging != kind) {
-                val rect = it.boundsInRoot()
-                if (edit.cards[kind] != rect) edit.cards[kind] = rect
-            }
         }
 }
 

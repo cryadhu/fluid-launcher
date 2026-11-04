@@ -66,7 +66,9 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     var widgetEdit by remember { mutableStateOf<FluidWidget?>(null) }
     var widgetEditPage by rememberSaveable { mutableStateOf("Home") }
     var pageEdit by remember { mutableStateOf<String?>(null) }
-    val edit = remember(pageEdit) { pageEdit?.let { PageEdit(it, model, scope) } }
+    val pageEdits=remember { mutableStateMapOf<String,PageEdit>() }
+    fun editFor(page:String)=pageEdits.getOrPut(page) { PageEdit(page,model,scope){pageEdit=page} }
+    val edit=pageEdit?.let { pageEdits[it] }
     var resizeEditor by remember { mutableStateOf<FluidWidget?>(null) }
     var dockDragging by remember { mutableStateOf(false) }
     var drawer by remember { mutableStateOf(false) }
@@ -137,7 +139,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { _ -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; pageEdit=page }) {
+    CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }) {
         FluidWallpaper()
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
@@ -147,7 +149,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                 val currentPage=state.config.pages[index]
                 Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(onClick={},onLongClick={showPanel("Customize:$currentPage")})) {
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
-                    val pageState=edit?.takeIf{it.page==currentPage}
+                    val pageState=editFor(currentPage)
                     when(state.config.pages[index]) {
                         "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize:Home")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch,pageState,finishPageEdit)
                         "Space" -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch,pageState,finishPageEdit)
