@@ -234,7 +234,7 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
     }
 }
 
-/** Wobble, lift, FLIP offsets and per-card measurement all live here so the page keeps its layout. */
+/** Lift, FLIP offsets and per-card measurement all live here so the page keeps its layout. */
 @Composable
 internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: State<Float>, index: Int): Modifier {
     if (edit == null) return this
@@ -261,7 +261,7 @@ internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: St
             }
             scaleX = scale
             scaleY = scale
-            rotationZ = if (edit.active && !isDragging && !removingThis) sin(phase.value + index * .7f) * 1.35f else 0f
+            rotationZ = 0f
             alpha = if (removingThis) edit.removeProgress.value else 1f
         }
         .onGloballyPositioned {
@@ -292,14 +292,22 @@ internal fun Modifier.pageEditDrag(kind: FluidWidget, edit: PageEdit): Modifier 
 internal fun BoxScope.PageEditOverlay(edit: PageEdit, onDone: () -> Unit) {
     AnimatedVisibility(
         visible = edit.active,
+        modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+        enter = slideInVertically(spring(dampingRatio = .8f, stiffness = 360f)) { -it / 2 } + fadeIn(tween(140)),
+        exit = slideOutVertically(tween(180)) { -it / 2 } + fadeOut(tween(120))
+    ) {
+        Row(Modifier.fillMaxWidth().glass(25.dp, true).padding(start = 16.dp, top = 9.dp, end = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { Text("Rearrange", style = F.text(18, true)); Text("Hold and drag · drop in a slot", style = F.text(10, muted = true)) }
+            GlassButton("Done", primary = true, glyph = "check", onClick = onDone)
+        }
+    }
+    AnimatedVisibility(
+        visible = edit.active,
         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 2.dp, vertical = 6.dp),
         enter = slideInVertically(spring(dampingRatio = .8f, stiffness = 360f)) { it } + fadeIn(tween(140)),
         exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(120))
     ) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                GlassButton("Done", primary = true, glyph = "check", onClick = onDone)
-            }
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             val hot = edit.overRemove
             Box(
                 Modifier.fillMaxWidth().height(68.dp)
