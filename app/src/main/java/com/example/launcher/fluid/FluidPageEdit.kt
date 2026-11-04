@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -63,6 +65,7 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
     val flips = mutableStateMapOf<FluidWidget, Animatable<Float, AnimationVector1D>>()
 
     private val flipJobs = mutableMapOf<FluidWidget, Job>()
+    private var settleJob: Job? = null
     private var visible: List<FluidWidget> = emptyList()
     private var spacingPx = 0f
     private var scroll: ScrollState? = null
@@ -85,13 +88,20 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
     fun begin(kind: FluidWidget, local: Offset) {
         if (!active || removing != null) return
         stopAutoScroll()
+        // Re-grabbing a card while it is still settling starts from the position the
+        // user can see, so the card never jumps back to its slot under the finger.
+        val carrying = if (settling == kind) settle?.value ?: Offset.Zero else Offset.Zero
+        if (settling == kind) {
+            settleJob?.cancel()
+            settleJob = null
+            settling = null
+            settle = null
+        }
         dragging = kind
-        settling = null
-        settle = null
-        drag = Offset.Zero
+        drag = carrying
         overRemove = false
         val rect = cards[kind] ?: Rect.Zero
-        pointer = rect.topLeft + local
+        pointer = rect.topLeft + carrying + local
     }
 
     fun dragBy(delta: Offset) {
@@ -112,23 +122,27 @@ internal class PageEdit(val page: String, private val model: FluidModel, private
             return
         }
         val anim = Animatable(drag, Offset.VectorConverter)
+        settleJob?.cancel()
         settle = anim
         settling = kind
         drag = Offset.Zero
         overRemove = false
-        scope.launch {
+        settleJob = scope.launch {
             anim.animateTo(Offset.Zero, spring(dampingRatio = .82f, stiffness = 760f))
-            if (settle === anim) { settle = null; settling = null }
+            if (settle === anim) { settle = null; settling = null; settleJob = null }
         }
     }
 
     fun close() {
         if (!active) return
         stopAutoScroll()
+        settleJob?.cancel()
+        settleJob = null
         active = false
         dragging = null
         settling = null
         settle = null
+        drag = Offset.Zero
         overRemove = false
     }
 
@@ -253,20 +267,45 @@ internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: St
             if (edit.cards[kind] != rect) edit.cards[kind] = rect
         }
     }
-    // The editor already exists before the finger lands, allowing the *same* long-press
-    // stream to transition into dragging instead of requiring a second touch.
-    if (!edit.active) return measured.pointerInput(kind) {
+    // This detector only opens the editor. The move stream is claimed below, in the
+    // Initial pass, because nested widget controls (text fields, rows, buttons) consume
+    // drags and would cancel the gesture that activated the editor.
+    val grip = measured.pointerInput(kind) {
         detectDragGesturesAfterLongPress(
-            onDragStart = { edit.activate(kind, it) },
-            onDragCancel = { edit.end() },
-            onDragEnd = { edit.end() },
-            onDrag = { change, amount -> change.consume(); edit.dragBy(amount) }
+            onDragStart = { if (!edit.active) edit.activate(kind, it) },
+            onDragCancel = {},
+            onDragEnd = {},
+            onDrag = { _, _ -> }
         )
+    }
+    val claim = grip.pointerInput(kind) {
+        var pointer: PointerId? = null
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (pointer == null) pointer = event.changes.firstOrNull { !it.previousPressed && it.pressed }?.id
+                if (edit.dragging != kind) {
+                    if (event.changes.none { it.pressed }) pointer = null
+                    continue
+                }
+                val change = event.changes.firstOrNull { it.id == pointer } ?: continue
+                if (!change.pressed) {
+                    pointer = null
+                    edit.end()
+                } else {
+                    val delta = change.position - change.previousPosition
+                    if (delta != Offset.Zero) {
+                        change.consume()
+                        edit.dragBy(delta)
+                    }
+                }
+            }
+        }
     }
     val flip = edit.flips[kind]
     val settle = if (edit.settling == kind) edit.settle else null
-    return measured
-        .zIndex(if (edit.dragging == kind || edit.removing == kind) 2f else 0f)
+    return claim
+        .zIndex(if (edit.dragging == kind || edit.settling == kind || edit.removing == kind) 2f else 0f)
         .graphicsLayer {
             val isDragging = edit.dragging == kind
             val removingThis = edit.removing == kind
@@ -296,8 +335,8 @@ internal fun Modifier.pageEditDrag(kind: FluidWidget, edit: PageEdit): Modifier 
     return this.pointerInput(kind, edit.active, edit.removing) {
         detectDragGestures(
             onDragStart = { edit.begin(kind, it) },
-            onDragEnd = { edit.end() },
-            onDragCancel = { edit.end() },
+            onDragEnd = {},
+            onDragCancel = {},
             onDrag = { change, amount -> change.consume(); edit.dragBy(amount) }
         )
     }

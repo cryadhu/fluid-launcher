@@ -485,3 +485,7 @@ Layout now includes Pages: add, move, and remove pages after the fixed Markets &
 ### v1.1.26 — In-page arrange and removal
 
 Arrange now happens on the page itself instead of opening a separate screen. Every widget card wobbles in place, a lifted card follows the finger, and displaced cards settle into their new slots with a quick spring rather than snapping. Cards are inset inside the scroll viewport so their glass shadows are no longer cropped. Removing a widget drops it into a red “Drag here to remove” bar that slides up from the bottom of the page, with a destination highlight while a card hovers over it. Layout reordering rewrites only the visible widget slots, so the fixed clock/weather row and the tiny control tiles keep their stored positions.
+
+### v1.1.30 — Rearrange in one continuous press
+
+Holding a widget now starts the drag in the same gesture: the card follows the finger without lifting. Nested widget controls no longer swallow the move stream, and widget cards keep their identity while their order changes, so the active drag survives every swap. Releasing a card settles it into the slot under the finger with the spring animation instead of leaving it at the release position. Long-pressing the page while rearranging no longer opens a Customize panel over the editor, and the Customize home button stays available whenever the page is idle.

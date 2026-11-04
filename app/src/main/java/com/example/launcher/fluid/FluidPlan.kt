@@ -29,15 +29,15 @@ import androidx.compose.ui.unit.*
     Box(modifier.navigationBarsPadding().onGloballyPositioned{edit?.viewport=it.boundsInRoot()}.testTag("fluid-plan")) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom=100.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             FluidHeading("Plan",fluidDate(state.now,"EEEE, MMM d"))
-            widgets.forEachIndexed { index,kind ->
-                Box(Modifier.pageEditCard(kind,edit,phase,index)) {
+            widgets.forEachIndexed { index,kind -> key(kind) {
+                Box(Modifier.pageEditCard(kind,edit,phase,index).testTag("fluid-widget-${kind.name}")) {
                     Column(Modifier.fillMaxWidth().glass(30.dp,kind==FluidWidget.AGENDA).combinedClickable(onLongClick={if(pageEditor==null)openEdit(kind)},onClick={if(kind==FluidWidget.AGENDA) model.open(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR)) else {}}).padding(20.dp)) {
                         if(kind==FluidWidget.TASKS) Text("Tasks",style=F.text(11,muted=true),modifier=Modifier.padding(bottom=10.dp))
                         WidgetBody(kind,state,model,calendarAccess=calendarAccess)
                     }
                     if(edit!=null && edit.active) Box(Modifier.matchParentSize().pageEditDrag(kind,edit))
                 }
-            }
+            } }
         }
         edit?.let { PageEditOverlay(it,finishEdit) }
     }

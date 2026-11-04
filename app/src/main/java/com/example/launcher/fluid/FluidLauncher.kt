@@ -147,7 +147,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                 .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null && pageEdit==null) { index ->
                 val distance = ((pager.currentPage-index)+pager.currentPageOffsetFraction).absoluteValue.coerceAtMost(1f)
                 val currentPage=state.config.pages[index]
-                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(onClick={},onLongClick={showPanel("Customize:$currentPage")})) {
+                Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(onClick={},onLongClick={if(pageEdits.values.none{it.active})showPanel("Customize:$currentPage")})) {
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
                     val pageState=editFor(currentPage)
                     CompositionLocalProvider(LocalPageEdit provides pageState) {
@@ -249,7 +249,7 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     SideEffect { edit?.bind(widgets,with(density){16.dp.toPx()},scroll) }
     Box(modifier.navigationBarsPadding().onGloballyPositioned{edit?.viewport=it.boundsInRoot()}.testTag("fluid-space")) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom=100.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-            FluidHeading("Your space","Apps and widgets, your way.") { if(edit==null) GlassIcon("edit","Organize spaces",onClick=manage) }
+            FluidHeading("Your space","Apps and widgets, your way.") { if(edit?.active!=true) GlassIcon("edit","Organize spaces",onClick=manage) }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 tabs.forEach { title ->
                     Box(Modifier.weight(1f).heightIn(min=46.dp).glass(24.dp).background(if(selected==title)F.purple.copy(alpha=.16f)else androidx.compose.ui.graphics.Color.Transparent)
@@ -269,7 +269,7 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
             } }
             ControlWidgetRows(state.config.spaceWidgets.filter{it in tinyControls},state,model)
             val openGallery=LocalSpaceWidgetGallery.current
-            if(edit==null) GlassButton("Add widgets",Modifier.fillMaxWidth(),glyph="plus",onClick=openGallery)
+            if(edit?.active!=true) GlassButton("Add widgets",Modifier.fillMaxWidth(),glyph="plus",onClick=openGallery)
         }
         edit?.let { PageEditOverlay(it,finishEdit) }
     }
