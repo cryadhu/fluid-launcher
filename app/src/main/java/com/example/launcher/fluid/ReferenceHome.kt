@@ -34,6 +34,7 @@ val LocalWeatherLocate = staticCompositionLocalOf<()->Unit> { {} }
 val LocalContactsAccess = staticCompositionLocalOf<()->Unit> { {} }
 val LocalSpaceWidgetGallery = staticCompositionLocalOf<()->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
+internal val LocalPageEdit = staticCompositionLocalOf<PageEdit?> { null }
 private data class WeatherPreview(val code:Int,val label:String,val day:Boolean,val wind:Double)
 internal fun weatherForDisplay(state:FluidState):HomeWeather? {
     if(state.weatherPreview==0)return state.weather

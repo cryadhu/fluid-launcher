@@ -150,12 +150,14 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                 Box(Modifier.fillMaxSize().graphicsLayer { scaleX=1f-distance*.045f; scaleY=scaleX; alpha=1f-distance*.28f; translationX=distance*8f }.combinedClickable(onClick={},onLongClick={showPanel("Customize:$currentPage")})) {
                     val padding = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal=22.dp).padding(top=16.dp)
                     val pageState=editFor(currentPage)
-                    when(state.config.pages[index]) {
-                        "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize:Home")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch,pageState,finishPageEdit)
-                        "Space" -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch,pageState,finishPageEdit)
-                        "Plan" -> FluidPlan(state,model,padding,calendarAccess,pageState,finishPageEdit)
-                        "Markets" -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
-                        else -> FluidCustomPage(currentPage,state,model,hero,padding,calendarAccess,activityAccess,pageState,finishPageEdit)
+                    CompositionLocalProvider(LocalPageEdit provides pageState) {
+                        when(state.config.pages[index]) {
+                            "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize:Home")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch,pageState,finishPageEdit)
+                            "Space" -> FluidSpace(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Spaces")},::launch,pageState,finishPageEdit)
+                            "Plan" -> FluidPlan(state,model,padding,calendarAccess,pageState,finishPageEdit)
+                            "Markets" -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
+                            else -> FluidCustomPage(currentPage,state,model,hero,padding,calendarAccess,activityAccess,pageState,finishPageEdit)
+                        }
                     }
                 }
             }
@@ -225,12 +227,13 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
 
 @Composable internal fun ExpandableWidget(kind:FluidWidget,state:FluidState,model:FluidModel,hero:FluidHero,calendar:()->Unit,activity:()->Unit,modifier:Modifier=Modifier) {
     val edit=LocalWidgetEdit.current
+    val pageEditor=LocalPageEdit.current
     val interaction=remember { MutableInteractionSource() }
     var source by remember { mutableStateOf(Rect.Zero) }
     val opensDetail=kind!=FluidWidget.TASKS && kind!=FluidWidget.AGENDA
     val surface=if(kind==FluidWidget.MUSIC_OPEN) Modifier else Modifier.glass(30.dp,true)
     Column(modifier.fillMaxWidth().onGloballyPositioned { source=Rect(it.positionInRoot(),it.size.toSize());hero.bounds[kind]=source }.graphicsLayer { alpha=if(hero.kind==kind) 0f else 1f }
-        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick={if(kind==FluidWidget.AGENDA)model.open(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR))else if(opensDetail)hero.open(kind,source)},onLongClick={edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
+        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick={if(kind==FluidWidget.AGENDA)model.open(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR))else if(opensDetail)hero.open(kind,source)},onLongClick={if(pageEditor==null)edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
         WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity,compact=state.config.sizes[kind]=="Compact")
     }
 }

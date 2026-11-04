@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.*
 /** A focused daily page: agenda, tasks, shortcuts, and the people the user starred. */
 @Composable internal fun FluidPlan(state:FluidState,model:FluidModel,modifier:Modifier,calendarAccess:()->Unit,edit:PageEdit?=null,finishEdit:()->Unit={}) {
     val openEdit=LocalWidgetEdit.current
+    val pageEditor=LocalPageEdit.current
     val scroll=rememberScrollState()
     val density=LocalDensity.current
     val widgets=state.config.planWidgets
@@ -30,7 +31,7 @@ import androidx.compose.ui.unit.*
             FluidHeading("Plan",fluidDate(state.now,"EEEE, MMM d"))
             widgets.forEachIndexed { index,kind ->
                 Box(Modifier.pageEditCard(kind,edit,phase,index)) {
-                    Column(Modifier.fillMaxWidth().glass(30.dp,kind==FluidWidget.AGENDA).combinedClickable(onLongClick={openEdit(kind)},onClick={if(kind==FluidWidget.AGENDA) model.open(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR)) else {}}).padding(20.dp)) {
+                    Column(Modifier.fillMaxWidth().glass(30.dp,kind==FluidWidget.AGENDA).combinedClickable(onLongClick={if(pageEditor==null)openEdit(kind)},onClick={if(kind==FluidWidget.AGENDA) model.open(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR)) else {}}).padding(20.dp)) {
                         if(kind==FluidWidget.TASKS) Text("Tasks",style=F.text(11,muted=true),modifier=Modifier.padding(bottom=10.dp))
                         WidgetBody(kind,state,model,calendarAccess=calendarAccess)
                     }

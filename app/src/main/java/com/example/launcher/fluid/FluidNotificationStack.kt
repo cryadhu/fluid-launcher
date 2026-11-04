@@ -32,6 +32,7 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
 @Composable internal fun NotificationStack(state: FluidState, model: FluidModel, detail: Boolean = false) {
     val notifications by FluidNotifications.items.collectAsState()
     val edit=LocalWidgetEdit.current
+    val pageEditor=LocalPageEdit.current
     var expanded by rememberSaveable { mutableStateOf(detail) }
     val size=state.config.sizes[FluidWidget.NOTIFICATIONS] ?: "Standard"
     val compactHeight=when(size) { "Compact"->88.dp;"Large"->112.dp;else->96.dp }
@@ -42,14 +43,14 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
     Column(Modifier.fillMaxWidth().padding(bottom=20.dp).testTag("fluid-widget-NOTIFICATIONS")) {
         Row(Modifier.fillMaxWidth().padding(horizontal=7.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
             Text("Notification(${notifications.size})",style=F.text(11,muted=true),modifier=Modifier.weight(1f)
-                .combinedClickable(onClick={},onLongClick={edit(FluidWidget.NOTIFICATIONS)}))
+                .combinedClickable(onClick={},onLongClick={if(pageEditor==null)edit(FluidWidget.NOTIFICATIONS)}))
             if(notifications.size>1 || expanded) TextButton(onClick={expanded=!expanded}) {
                 Text(if(expanded) "Collapse" else "See all",style=F.text(11,true),color=F.purple)
             }
             if(notifications.any { it.clearable }) TextButton(onClick={FluidNotifications.clear()}) { Text("Clear all",style=F.text(11,true),color=F.purple) }
         }
         if(notifications.isEmpty()) {
-            Column(Modifier.fillMaxWidth().glass(28.dp,elevated=true).combinedClickable(onClick={if(!state.device.mediaAccess) model.accessNotifications()},onLongClick={edit(FluidWidget.NOTIFICATIONS)}).padding(20.dp)) {
+            Column(Modifier.fillMaxWidth().glass(28.dp,elevated=true).combinedClickable(onClick={if(!state.device.mediaAccess) model.accessNotifications()},onLongClick={if(pageEditor==null)edit(FluidWidget.NOTIFICATIONS)}).padding(20.dp)) {
                 Text(if(state.device.mediaAccess) "All caught up" else "A clearer view of your day",style=F.text(15,true))
                 Text(if(state.device.mediaAccess) "New notifications will stack here." else "Connect notifications to show your live updates.",style=F.text(11,muted=true),modifier=Modifier.padding(top=7.dp))
                 if(!state.device.mediaAccess) GlassButton("Connect notifications",Modifier.padding(top=12.dp),onClick=model::accessNotifications)

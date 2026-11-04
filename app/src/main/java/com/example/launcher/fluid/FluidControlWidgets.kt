@@ -22,6 +22,7 @@ internal val tinyControls=setOf(FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidg
 
 @Composable internal fun TinyControl(kind:FluidWidget,state:FluidState,model:FluidModel,modifier:Modifier=Modifier) {
     val edit=LocalWidgetEdit.current
+    val pageEditor=LocalPageEdit.current
     val context=LocalContext.current
     val camera=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if(it)model.toggle("torch")else model.message("Allow camera access to use the flashlight") }
     val (active,subtitle)=when(kind) {
@@ -37,7 +38,7 @@ internal val tinyControls=setOf(FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidg
         .combinedClickable(role=Role.Button,onClick={
             if(kind==FluidWidget.FLASHLIGHT && androidx.core.content.ContextCompat.checkSelfPermission(context,android.Manifest.permission.CAMERA)!=android.content.pm.PackageManager.PERMISSION_GRANTED)camera.launch(android.Manifest.permission.CAMERA)
             else model.toggle(action)
-        },onLongClick={edit(kind)}).testTag("fluid-widget-${kind.name}").padding(horizontal=8.dp,vertical=14.dp),
+        },onLongClick={if(pageEditor==null)edit(kind)}).testTag("fluid-widget-${kind.name}").padding(horizontal=8.dp,vertical=14.dp),
         horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp,Alignment.CenterVertically)) {
         Glyph(if(kind==FluidWidget.SOUND && state.device.soundMode==SoundMode.VIBRATE)"vibrate"else kind.glyph,if(active)F.purple else F.muted,Modifier.size(24.dp))
         Text(kind.title,style=F.text(11,true),maxLines=1)

@@ -339,8 +339,10 @@ internal fun BoxScope.PageEditOverlay(edit: PageEdit, onDone: () -> Unit) {
                     .semantics { stateDescription = if (hot) "Ready to remove" else "Drag here to remove" },
                 contentAlignment = Alignment.Center
             ) {
-                Glyph("bin", Color(0xFFE05B67), Modifier.size(24.dp))
-                Text(if (hot) "Release to remove" else "Drag here to remove", style = F.text(15, true), color = Color(0xFFE05B67), modifier = Modifier.padding(start = 10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Glyph("bin", Color(0xFFE05B67), Modifier.size(24.dp))
+                    Text(if (hot) "Release to remove" else "Drag here to remove", style = F.text(15, true), color = Color(0xFFE05B67), modifier = Modifier.padding(start = 10.dp))
+                }
             }
         }
     }
