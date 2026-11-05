@@ -72,6 +72,7 @@ internal class PageEdit(
     val route: DragRoute = DragRoute(),
     private val onActivated: () -> Unit = {},
     private val onPageDropped: (String) -> Unit = {},
+    private val onFinished: () -> Unit = {},
     private val onHandoff: (kind: FluidWidget, target: String, at: Offset, grab: Offset, height: Float) -> Unit = { _, _, _, _, _ -> }
 ) {
     var active by mutableStateOf(false)
@@ -235,7 +236,7 @@ internal class PageEdit(
         overRemove = false
         settleJob = scope.launch {
             anim.animateTo(Offset.Zero, spring(dampingRatio = .82f, stiffness = 760f))
-            if (settle === anim) { settle = null; settling = null; settleJob = null }
+            if (settle === anim) { settle = null; settling = null; settleJob = null; onFinished() }
         }
     }
 
@@ -276,6 +277,7 @@ internal class PageEdit(
             if (route.lifted == kind) route.lifted = null
             removing = null
             removeProgress.snapTo(1f)
+            onFinished()
         }
     }
 
@@ -470,7 +472,7 @@ internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: St
         }
 }
 
-/** Draws the lifted card above every page, the editor chrome and the bin. */
+/** Draws the lifted card above every page; only the bin is drawn over it. */
 @Composable
 internal fun DragGhost(route: DragRoute, edits: Map<String, PageEdit>) {
     val layer = rememberGraphicsLayer()
@@ -525,18 +527,7 @@ internal fun Modifier.pageEditDrag(kind: FluidWidget, edit: PageEdit): Modifier 
 }
 
 @Composable
-internal fun BoxScope.PageEditOverlay(edit: PageEdit, onDone: () -> Unit) {
-    AnimatedVisibility(
-        visible = edit.active,
-        modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 10.dp, vertical = 8.dp),
-        enter = slideInVertically(spring(dampingRatio = .8f, stiffness = 360f)) { -it / 2 } + fadeIn(tween(140)),
-        exit = slideOutVertically(tween(180)) { -it / 2 } + fadeOut(tween(120))
-    ) {
-        Row(Modifier.fillMaxWidth().glass(25.dp, true).padding(start = 16.dp, top = 9.dp, end = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text("Rearrange", style = F.text(18, true)); Text("Hold and drag · drop in a slot", style = F.text(10, muted = true)) }
-            GlassButton("Done", primary = true, glyph = "check", onClick = onDone)
-        }
-    }
+internal fun BoxScope.RemoveTarget(edit: PageEdit) {
     AnimatedVisibility(
         visible = edit.active,
         modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 42.dp),
@@ -565,6 +556,10 @@ internal fun BoxScope.PageEditOverlay(edit: PageEdit, onDone: () -> Unit) {
             Glyph("bin", lerp(red, Color.White, lift), Modifier.size(22.dp))
         }
     }
+}
+
+@Composable
+internal fun BoxScope.PageEditOverlay(edit: PageEdit) {
     AnimatedVisibility(
         visible = edit.active && edit.newPageArmed,
         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(112.dp),

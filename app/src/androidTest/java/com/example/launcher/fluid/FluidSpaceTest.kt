@@ -12,7 +12,7 @@ class FluidSpaceTest {
     @get:Rule val compose=createComposeRule()
     private val model=FluidModel(ApplicationProvider.getApplicationContext<Application>())
     @Test fun homeReturnSelectsSecondPageAndSpaceWidgetsCanBeRemoved() {
-        model.configure { it.copy(widgets=FluidConfig().widgets,spaceWidgets=listOf(FluidWidget.TASKS),autoWeather=false) }
+        model.configure { it.copy(widgets=FluidConfig().widgets,spaceWidgets=listOf(FluidWidget.SPACE_APPS,FluidWidget.TASKS),autoWeather=false) }
         compose.setContent { FluidTheme(model.state.value.config) { FluidLauncher(model,{}) } }
         compose.onNodeWithTag("fluid-home").assertExists()
         compose.onNodeWithContentDescription("Markets").performClick()

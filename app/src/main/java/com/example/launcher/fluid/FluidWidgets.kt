@@ -127,7 +127,6 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                 var city by remember(state.config.city) { mutableStateOf(state.config.city) }
                 Spacer(Modifier.height(18.dp)); FluidField(city,"City",{city=it})
                 GlassButton(if(state.weatherLoading) "Refreshing…" else "Update weather",Modifier.padding(top=12.dp),primary=true) { model.weatherCity(city) }
-                GlassButton("Cycle animation",Modifier.padding(top=10.dp),glyph="next") { model.cycleWeatherPreview() }
                 state.weatherError?.let { Text(it,style=F.text(12,muted=true),modifier=Modifier.padding(top=12.dp)) }
                 state.weather?.hours?.forEach { hour -> Row(Modifier.fillMaxWidth().padding(top=18.dp),horizontalArrangement=Arrangement.SpaceBetween) { Text(hour.time,style=F.text()); Text("${hour.temperature.roundToInt()}°",style=F.text(14,true)) } }
                 Text("Open-Meteo · live forecast",style=F.text(10,muted=true),modifier=Modifier.padding(top=20.dp))
@@ -187,6 +186,7 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
                 Text(fluidDate(state.now,"EEE"),style=F.text(13)); Text(fluidDate(state.now,"d"),style=F.text(if(detail) 96 else if(compact)32 else 44,true)); Text(fluidDate(state.now,"MMMM yyyy"),style=F.text(12,muted=true))
             }
         }
+        FluidWidget.SPACE_APPS -> SpaceAppsWidget(state)
     }
 }
 

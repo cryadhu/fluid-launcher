@@ -38,16 +38,6 @@ val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
 internal val LocalPageEdit = staticCompositionLocalOf<PageEdit?> { null }
 /** Shared with the page surface so content-level press anchors still light the full page. */
 internal val LocalPagePress = staticCompositionLocalOf<MutableInteractionSource?> { null }
-private data class WeatherPreview(val code:Int,val label:String,val day:Boolean,val wind:Double)
-internal fun weatherForDisplay(state:FluidState):HomeWeather? {
-    if(state.weatherPreview==0)return state.weather
-    val preview=listOf(
-        WeatherPreview(0,"Sunny",true,5.0), WeatherPreview(3,"Cloudy",true,9.0), WeatherPreview(63,"Rainy",true,14.0), WeatherPreview(95,"Thunderstorm",true,18.0),
-        WeatherPreview(71,"Snow",true,7.0), WeatherPreview(45,"Misty",true,5.0), WeatherPreview(2,"Windy",true,32.0), WeatherPreview(1,"Clear night",false,4.0)
-    )[state.weatherPreview-1]
-    val base=state.weather ?: HomeWeather("Preview",22.0,preview.label,emptyList(),preview.code,preview.day,preview.wind)
-    return base.copy(code=preview.code,condition=preview.label,isDay=preview.day,windSpeed=preview.wind)
-}
 internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==FluidWidget.BRIGHTNESS || kind==FluidWidget.VOLUME) when(config.sizes[kind]) { "Compact"->64.dp;"Large"->112.dp;else->80.dp } else when(config.sizes[kind]) { "Compact" -> 96.dp; "Large" -> if(kind==FluidWidget.NOTIFICATIONS) 248.dp else 230.dp; else -> 138.dp }
 
 @Composable internal fun FluidHome(state:FluidState,model:FluidModel,hero:FluidHero,badges:Set<String>,modifier:Modifier,calendar:()->Unit,activity:()->Unit,customize:()->Unit,ask:()->Unit,space:()->Unit,launch:(InstalledApp,Rect)->Unit,edit:PageEdit?=null) {
@@ -95,7 +85,8 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                 } }
                 ControlWidgetRows(state.config.widgets.filter{it in tinyControls},state,model)
             }
-            FluidDock(state, model, badges, ask, launch)
+            val dockBlur by animateDpAsState(if(edit?.active==true) 10.dp else 0.dp,spring(1f,300f),label="Dock edit blur")
+            Box(Modifier.blur(dockBlur,BlurredEdgeTreatment.Unbounded)) { FluidDock(state, model, badges, ask, launch) }
         }
     }
 }
@@ -142,7 +133,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     val rain by transition.animateFloat(0f,1f,infiniteRepeatable(tween(1100,easing=LinearEasing)),label="Rain fall")
     val cycle by transition.animateFloat(0f,1f,infiniteRepeatable(tween(4200,easing=LinearEasing)),label="Weather cycle")
     val spin by transition.animateFloat(0f,360f,infiniteRepeatable(tween(30000,easing=LinearEasing)),label="Sun rays")
-    val weather=weatherForDisplay(state)
+    val weather=state.weather
     val code=weather?.code ?: -1
     val thunder=code in 95..99
     val wet=code in 51..67 || code in 80..82 || thunder

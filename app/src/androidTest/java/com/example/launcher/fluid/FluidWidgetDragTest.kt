@@ -50,9 +50,10 @@ class FluidWidgetDragTest {
             repeat(10) { moveBy(Offset(0f, travel / 8f), delayMillis = 40) }
             up()
         }
-        compose.onNodeWithText("Rearrange").assertExists()
         compose.mainClock.advanceTimeBy(1200)
         compose.waitForIdle()
+        // Releasing the card ends the edit session; there is no separate Done step.
+        compose.onNodeWithTag("widget-remove-target").assertDoesNotExist()
 
         val settledTasks = tasks.fetchSemanticsNode().boundsInRoot
         val settledQuick = quick.fetchSemanticsNode().boundsInRoot
