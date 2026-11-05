@@ -40,12 +40,31 @@ class FluidConfigTest {
         assertEquals(listOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.NOTIFICATIONS,FluidWidget.AGENDA),config.widgets)
         assertEquals("Auto",config.mode)
         assertEquals(listOf("@auto"),config.dock)
-        assertTrue(config.work.isEmpty())
+        assertEquals(listOf("Work","Personal","Tools"),config.spaces.map{it.name})
+        assertTrue(config.spaces.all{it.apps.isEmpty()})
+    }
+    @Test fun spaceTabsPersistAndOldWorkPersonalToolsAssignmentsMigrate() {
+        val config=FluidConfig(spaces=listOf(SpaceTab(4,"Games",setOf("a/Main","b/Main")),SpaceTab(9,"Read")))
+        assertEquals(config,decodeFluid(encodeFluid(config)))
+        val old=decodeFluid("""{"work":["w/Main"],"personal":["p/Main"],"tools":["t/Main","w/Main"]}""")
+        assertEquals(listOf(SpaceTab(1,"Work",setOf("w/Main")),SpaceTab(2,"Personal",setOf("p/Main")),SpaceTab(3,"Tools",setOf("t/Main","w/Main"))),old.spaces)
+        assertTrue(decodeFluid(encodeFluid(FluidConfig(spaces=emptyList()))).spaces.isEmpty())
+        val duplicated=decodeFluid("""{"spaces":[{"id":1,"name":"Work"},{"id":1,"name":"work"},{"id":1,"name":"Fun"},{"id":2,"name":" "}]}""")
+        assertEquals(listOf(SpaceTab(1,"Work"),SpaceTab(2,"Fun")),duplicated.spaces)
+    }
+    @Test fun spaceNamesMustBeUniqueAndNotAll() {
+        val spaces=listOf(SpaceTab(1,"Work"),SpaceTab(2,"Play"))
+        assertNull(validSpaceName("  work ",spaces))
+        assertNull(validSpaceName("all",spaces))
+        assertNull(validSpaceName("   ",spaces))
+        assertEquals("Work",validSpaceName("Work",spaces,except=1))
+        assertEquals("Reading",validSpaceName(" Reading ",spaces))
+        assertEquals(SPACE_NAME_LIMIT,validSpaceName("x".repeat(40),spaces)!!.length)
     }
     @Test fun spaceWidgetsAndAllAppSectionsPersistIndependentlyOfHome() {
         val defaults=FluidConfig()
         assertFalse(FluidWidget.AGENDA in defaults.spaceWidgets)
-        val config=defaults.copy(tools=setOf("tools/Main"),work=setOf("work/Main"),personal=setOf("personal/Main"),spaceWidgets=emptyList())
+        val config=defaults.copy(spaces=listOf(SpaceTab(1,"Work",setOf("work/Main")),SpaceTab(2,"Tools",setOf("tools/Main"))),spaceWidgets=emptyList())
         val restored=decodeFluid(encodeFluid(config))
         assertEquals(config,restored)
         assertTrue(restored.spaceWidgets.isEmpty())
@@ -54,7 +73,7 @@ class FluidConfigTest {
         assertEquals(1,HOME_PAGE)
     }
     @Test fun widgetOrderSpacesAndEmptyDockSurviveRestart() {
-        val config=FluidConfig(widgets=listOf(FluidWidget.STORAGE,FluidWidget.WEATHER),mode="Dark",labels=false,city="Bengaluru",work=setOf("work/Main"),personal=setOf("personal/Main"),dock=emptyList())
+        val config=FluidConfig(widgets=listOf(FluidWidget.STORAGE,FluidWidget.WEATHER),mode="Dark",labels=false,city="Bengaluru",spaces=listOf(SpaceTab(1,"Work",setOf("work/Main"))),dock=emptyList())
         assertEquals(config,decodeFluid(encodeFluid(config)))
     }
     @Test fun corruptPreferencesRecoverAndUnknownWidgetsAreIgnored() {

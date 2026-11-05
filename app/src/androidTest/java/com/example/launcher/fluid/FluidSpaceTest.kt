@@ -24,7 +24,7 @@ class FluidSpaceTest {
         compose.waitUntil(10000){model.state.value.apps.size>=3}
         compose.runOnIdle {
             val apps=model.state.value.apps
-            model.configure{it.copy(work=setOf(apps[0].component.flattenToString()),personal=setOf(apps[1].component.flattenToString()),tools=setOf(apps[2].component.flattenToString()))}
+            model.configure{it.copy(spaces=listOf(SpaceTab(1,"Work",setOf(apps[0].component.flattenToString())),SpaceTab(2,"Personal",setOf(apps[1].component.flattenToString())),SpaceTab(3,"Tools",setOf(apps[2].component.flattenToString()))))}
         }
         compose.onNodeWithTag("space-apps-Work").assertExists()
         compose.onNodeWithText("Personal",substring=false).performClick()

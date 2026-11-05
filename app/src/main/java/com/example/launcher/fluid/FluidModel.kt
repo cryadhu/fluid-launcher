@@ -20,7 +20,7 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
     AGENDA("Agenda", "Your day, at a glance", "calendar"), QUICK_ACTIONS("Quick actions", "Useful tools at a touch", "app"), FAVORITES("Favorites", "Your starred contacts", "contacts"), MUSIC("Music", "Orb with glass background", "music"), MUSIC_OPEN("Music (open)", "Orb without background", "music"),
     WEATHER("Weather", "A window outside", "weather"), TASKS("Tasks", "Make room for focus", "tasks"),
     ACTIVITY("Activity", "Steps while the launcher is active", "health"), STORAGE("Storage", "Space for what matters", "files"), DATE("Date", "A moment in time", "calendar"),
-    SPACE_APPS("Space apps", "Work, personal and tools", "app"),
+    SPACE_APPS("Space apps", "Your apps, grouped in tabs", "app"),
     SUN_PATH("Sun path", "Sunrise to sunset", "weather"), WIND("Wind", "Speed and direction", "weather"),
     FOCUS("Focus", "A 25 minute focus ring", "clock"), BREATHE("Breathe", "A calm breathing guide", "health"), WORLD_CLOCKS("World clocks", "Time around the world", "clock"),
     NOW_PLAYING("Now playing", "Your music, spinning", "music"), BATTERY("Battery", "Charge at a glance", "health"), HYDRATION("Water", "Glasses through the day", "health"), ACTIVITY_RINGS("Activity rings", "Move, exercise and stand", "health")
@@ -44,16 +44,24 @@ internal fun widgetGrid(kind:FluidWidget,size:String="Standard"):String = fixedW
     else -> when(size) { "Compact"->"4×1"; "Large"->if(kind==FluidWidget.NOTIFICATIONS) "4×4" else "4×3"; else->"4×2" }
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
+/** A named tab in the Space apps widget; an app can belong to any number of tabs. */
+data class SpaceTab(val id: Long, val name: String, val apps: Set<String> = emptySet())
+internal val defaultSpaces = listOf(SpaceTab(1, "Work"), SpaceTab(2, "Personal"), SpaceTab(3, "Tools"))
+internal const val SPACE_NAME_LIMIT = 16
+/** Returns the trimmed name when it can be used for a new or renamed tab. */
+internal fun validSpaceName(name: String, spaces: List<SpaceTab>, except: Long? = null): String? = name.trim().take(SPACE_NAME_LIMIT).takeIf { trimmed ->
+    trimmed.isNotEmpty() && !trimmed.equals("All", true) && spaces.none { it.id != except && it.name.equals(trimmed, true) }
+}
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Auto", val labels: Boolean = true,
-    val city: String = "", val work: Set<String> = emptySet(), val personal: Set<String> = emptySet(), val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 4, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true, val tools: Set<String> = emptySet(), val spaceWidgets: List<FluidWidget> = listOf(FluidWidget.SPACE_APPS, FluidWidget.TASKS), val homeWallpaper:String="Dawn", val lockWallpaper:String="Dawn", val homeWallpaperBlur:Boolean=false, val lockWallpaperBlur:Boolean=false, val favoriteApps:Set<String> = emptySet(), val pages:List<String> = listOf("Markets","Home","Space","Plan"), val accent:String="#8051FF", val planWidgets:List<FluidWidget> = listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES), val pageWidgets:Map<String,List<FluidWidget>> = emptyMap())
+    val city: String = "", val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 4, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true, val spaceWidgets: List<FluidWidget> = listOf(FluidWidget.SPACE_APPS, FluidWidget.TASKS), val homeWallpaper:String="Dawn", val lockWallpaper:String="Dawn", val homeWallpaperBlur:Boolean=false, val lockWallpaperBlur:Boolean=false, val favoriteApps:Set<String> = emptySet(), val pages:List<String> = listOf("Markets","Home","Space","Plan"), val accent:String="#8051FF", val planWidgets:List<FluidWidget> = listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES), val pageWidgets:Map<String,List<FluidWidget>> = emptyMap(), val spaces:List<SpaceTab> = defaultSpaces)
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
-    put("tools",JSONArray(config.tools.toList()));put("spaceWidgets",JSONArray(config.spaceWidgets.map{it.name}));put("spaceAppsVersion",1)
+    put("spaces",JSONArray(config.spaces.map{ JSONObject().put("id",it.id).put("name",it.name).put("apps",JSONArray(it.apps.toList())) }));put("spaceWidgets",JSONArray(config.spaceWidgets.map{it.name}));put("spaceAppsVersion",1)
     put("themeVersion",1);put("wallpaperVersion",3);put("dockDefaultsVersion",2)
     put("homeWallpaper",config.homeWallpaper);put("lockWallpaper",config.lockWallpaper);put("homeWallpaperBlur",config.homeWallpaperBlur);put("lockWallpaperBlur",config.lockWallpaperBlur)
     put("autoWeather",config.autoWeather)
     put("dockCount", config.dockCount); put("dockLabels", config.dockLabels); put("dockIconSize", config.dockIconSize); put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
-    put("work", JSONArray(config.work.toList())); put("personal", JSONArray(config.personal.toList())); put("dock", JSONArray(config.dock));put("favoriteApps",JSONArray(config.favoriteApps.toList()));put("pages",JSONArray(config.pages));put("accent",config.accent);put("planWidgets",JSONArray(config.planWidgets.map{it.name}));put("pageWidgets",JSONObject(config.pageWidgets.mapValues{JSONArray(it.value.map{widget->widget.name})}))
+    put("dock", JSONArray(config.dock));put("favoriteApps",JSONArray(config.favoriteApps.toList()));put("pages",JSONArray(config.pages));put("accent",config.accent);put("planWidgets",JSONArray(config.planWidgets.map{it.name}));put("pageWidgets",JSONObject(config.pageWidgets.mapValues{JSONArray(it.value.map{widget->widget.name})}))
 }.toString()
 fun decodeFluid(raw: String): FluidConfig = runCatching {
     val j = JSONObject(raw)
@@ -64,8 +72,21 @@ fun decodeFluid(raw: String): FluidConfig = runCatching {
     val pageWidgets=j.optJSONObject("pageWidgets")?.let { objectValue -> objectValue.keys().asSequence().associateWith { page -> (objectValue.optJSONArray(page)?.let { array -> (0 until array.length()).mapNotNull { index -> FluidWidget.entries.find { it.name==array.optString(index) } } } ?: emptyList()).distinct() } } ?: emptyMap()
     FluidConfig(widgets,
         (if(j.has("themeVersion"))j.optString("mode", "Auto")else "Auto").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Auto", j.optBoolean("labels", true),
-        j.optString("city"), list("work").toSet(), list("personal").toSet(), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",4).let { if(!j.has("dockDefaultsVersion") && it==3 && list("dock")==listOf("@auto"))4 else it }.coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true),list("tools").toSet(),(if(j.has("spaceWidgets"))list("spaceWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}.distinct()else listOf(FluidWidget.TASKS)).let{ if(j.has("spaceAppsVersion") || FluidWidget.SPACE_APPS in it) it else listOf(FluidWidget.SPACE_APPS)+it }).copy(homeWallpaper=j.optString("homeWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",lockWallpaper=j.optString("lockWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",homeWallpaperBlur=j.optBoolean("homeWallpaperBlur",false),lockWallpaperBlur=j.optBoolean("lockWallpaperBlur",false),favoriteApps=list("favoriteApps").toSet(),pages=(if(j.has("pages"))list("pages")else listOf("Markets","Home","Space","Plan")).let{listOf("Markets","Home")+it.filter{page->page !in listOf("Markets","Home")}.distinct()},accent=j.optString("accent","#8051FF").takeIf{runCatching{android.graphics.Color.parseColor(it)}.isSuccess} ?: "#8051FF",planWidgets=(if(j.has("planWidgets"))list("planWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}else listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES)).distinct(),pageWidgets=pageWidgets)
+        j.optString("city"), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",4).let { if(!j.has("dockDefaultsVersion") && it==3 && list("dock")==listOf("@auto"))4 else it }.coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true),(if(j.has("spaceWidgets"))list("spaceWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}.distinct()else listOf(FluidWidget.TASKS)).let{ if(j.has("spaceAppsVersion") || FluidWidget.SPACE_APPS in it) it else listOf(FluidWidget.SPACE_APPS)+it }).copy(homeWallpaper=j.optString("homeWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",lockWallpaper=j.optString("lockWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",homeWallpaperBlur=j.optBoolean("homeWallpaperBlur",false),lockWallpaperBlur=j.optBoolean("lockWallpaperBlur",false),favoriteApps=list("favoriteApps").toSet(),pages=(if(j.has("pages"))list("pages")else listOf("Markets","Home","Space","Plan")).let{listOf("Markets","Home")+it.filter{page->page !in listOf("Markets","Home")}.distinct()},accent=j.optString("accent","#8051FF").takeIf{runCatching{android.graphics.Color.parseColor(it)}.isSuccess} ?: "#8051FF",planWidgets=(if(j.has("planWidgets"))list("planWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}else listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES)).distinct(),pageWidgets=pageWidgets,spaces=decodeSpaces(j))
 }.getOrDefault(FluidConfig())
+
+private fun decodeSpaces(j: JSONObject): List<SpaceTab> {
+    fun strings(array: JSONArray?) = array?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty().toSet()
+    val stored = j.optJSONArray("spaces") ?: return listOf("work", "personal", "tools").zip(defaultSpaces) { key, tab -> tab.copy(apps = strings(j.optJSONArray(key))) }
+    val tabs = mutableListOf<SpaceTab>()
+    for (index in 0 until stored.length()) {
+        val item = stored.optJSONObject(index) ?: continue
+        val name = validSpaceName(item.optString("name"), tabs) ?: continue
+        val id = item.optLong("id", index + 1L).takeIf { id -> tabs.none { it.id == id } } ?: ((tabs.maxOfOrNull { it.id } ?: 0) + 1)
+        tabs += SpaceTab(id, name, strings(item.optJSONArray("apps")))
+    }
+    return tabs
+}
 
 data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<InstalledApp> = emptyList(), val loading: Boolean = true,
     val device: DeviceState = DeviceState(), val now: Long = System.currentTimeMillis(), val homeEpoch: Int = 0, val wallpaperApplying:Boolean=false,
@@ -194,9 +215,24 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
             else->c.copy(pageWidgets=c.pageWidgets+(page to reorder(c.pageWidgets[page].orEmpty())))
         } }
     }
-    fun assign(app: InstalledApp, space: String) = configure { c ->
-        val key = app.component.flattenToString()
-        c.copy(work = if (space == "Work") c.work + key else c.work - key, personal = if (space == "Personal") c.personal + key else c.personal - key, tools=if(space=="Tools")c.tools+key else c.tools-key)
+    fun toggleSpaceApp(space: Long, key: String) = configure { c ->
+        c.copy(spaces = c.spaces.map { if (it.id == space) it.copy(apps = if (key in it.apps) it.apps - key else it.apps + key) else it })
+    }
+    /** Returns the new tab's id, or null when the name is empty or already taken. */
+    fun addSpace(name: String): Long? {
+        var id: Long? = null
+        configure { c -> val valid = validSpaceName(name, c.spaces) ?: return@configure c
+            val next = (c.spaces.maxOfOrNull { it.id } ?: 0) + 1; id = next; c.copy(spaces = c.spaces + SpaceTab(next, valid)) }
+        return id
+    }
+    fun renameSpace(space: Long, name: String) = configure { c ->
+        val valid = validSpaceName(name, c.spaces, except = space) ?: return@configure c
+        c.copy(spaces = c.spaces.map { if (it.id == space) it.copy(name = valid) else it })
+    }
+    fun deleteSpace(space: Long) = configure { c -> c.copy(spaces = c.spaces.filterNot { it.id == space }) }
+    fun moveSpace(space: Long, by: Int) = configure { c ->
+        val from = c.spaces.indexOfFirst { it.id == space }; val to = from + by
+        if (from < 0 || to !in c.spaces.indices) c else c.copy(spaces = c.spaces.toMutableList().apply { add(to, removeAt(from)) })
     }
     fun toggleFavoriteApp(key:String) = configure { c -> c.copy(favoriteApps=if(key in c.favoriteApps)c.favoriteApps-key else c.favoriteApps+key) }
     fun addPage(): String {

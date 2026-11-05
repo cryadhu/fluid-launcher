@@ -188,7 +188,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceApps provides SpaceAppsHost(badges,::launch,{showPanel("Spaces")}),LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
+    CompositionLocalProvider(LocalSpaceApps provides SpaceAppsHost(badges,::launch,{ id -> showPanel(if(id==null)"Spaces" else "Spaces:$id") }),LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }.routePageDrags(pageEdits)) {
         FluidWallpaper(Modifier.blur(editBlur))
         if(editBlur>0.dp) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=editBlur.value/16f*.10f)))
@@ -233,7 +233,8 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
             AnimatedContent(targetState=panel ?: lastPanel,transitionSpec={
                 (fadeIn(tween(210))+slideInHorizontally(spring(.95f,350f)){it/10}) togetherWith (fadeOut(tween(130))+slideOutHorizontally(tween(190)){-it/16})
             },label="Glass panel navigation") { name ->
-                FluidPanel(name,state,model,chooseHome,{panel=null},::navigatePanel,calendarAccess,activityAccess,::panelBack)
+                val spaceStart=if(name.startsWith("Spaces:")) name.removePrefix("Spaces:").toLongOrNull() else null
+                FluidPanel(if(name.startsWith("Spaces:"))"Spaces" else name,state,model,chooseHome,{panel=null},::navigatePanel,calendarAccess,activityAccess,::panelBack,spaceStart)
             }
         }
         AnimatedVisibility(appMenu!=null,enter=fadeIn(tween(110))+scaleIn(spring(.75f,450f),initialScale=.9f),exit=fadeOut(tween(100))+scaleOut(tween(130),targetScale=.96f)) {
@@ -321,27 +322,8 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     }
 }
 
-@Immutable internal class SpaceAppsHost(val badges:Set<String>,val launch:(InstalledApp,Rect)->Unit,val manage:()->Unit)
+@Immutable internal class SpaceAppsHost(val badges:Set<String>,val launch:(InstalledApp,Rect)->Unit,val manage:(Long?)->Unit)
 internal val LocalSpaceApps = compositionLocalOf { SpaceAppsHost(emptySet(),{_,_->},{}) }
-
-@Composable internal fun SpaceAppsWidget(state:FluidState) {
-    val host=LocalSpaceApps.current
-    var selected by rememberSaveable { mutableStateOf("Work") }
-    val apps=fluidFilteredApps(state.apps,state.config,"",selected)
-    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            listOf("Work","Personal","Tools").forEach { title ->
-                Box(Modifier.weight(1f).heightIn(min=42.dp).glass(21.dp).background(if(selected==title)F.purple.copy(alpha=.16f)else Color.Transparent)
-                    .clickable(role=Role.Tab){selected=title}.semantics{this.selected=title==selected}.padding(vertical=10.dp),contentAlignment=Alignment.Center) { Text(title,style=F.text(12,true),maxLines=1) }
-            }
-        }
-        if(apps.isEmpty()) Column(Modifier.fillMaxWidth().padding(horizontal=4.dp)) {
-            Text("Choose the apps that belong in ${selected.lowercase()}.",style=F.text(13,muted=true));GlassButton("Choose apps",Modifier.padding(top=12.dp),glyph="plus",onClick=host.manage)
-        } else Column(Modifier.fillMaxWidth().testTag("space-apps-$selected")) {
-            apps.chunked(4).forEach { group -> Row(Modifier.fillMaxWidth()) { group.forEach { app -> FluidAppTile(app,host.badges,state.config.labels,host.launch,{},Modifier.weight(1f)) };repeat(4-group.size){Spacer(Modifier.weight(1f))} } }
-        }
-    }
-}
 
 @Composable internal fun FluidCustomPage(page:String,state:FluidState,model:FluidModel,hero:FluidHero,modifier:Modifier,calendar:()->Unit,activity:()->Unit,edit:PageEdit?=null) {
     val widgets=model.widgetsForPage(page)

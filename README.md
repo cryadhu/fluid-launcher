@@ -506,6 +506,15 @@ A dragged widget now floats above the pages in its own overlay, so it stays unde
 
 Rearranging no longer shows a top bar with a Done button. Hold a widget, drag it, and let go: once the card settles into its slot, or is dropped on the bin, the page leaves edit mode by itself. The bin button is now drawn above the floating card, so it stays visible while you drag onto it. While a widget is being dragged, the dock and the page indicator blur along with the wallpaper. The weather widget always shows the real forecast; the "Cycle animation" preview button is gone. The Work / Personal / Tools app tabs on Your space are now a regular "Space apps" widget that can be reordered, moved to another page or removed; existing setups get it added to the top of the Space page.
 
+### v1.1.36 — Editable Space apps tabs
+
+- The Space apps widget lines its tabs up on the left and keeps an Edit icon fixed on the right.
+- A glass pill slides between tabs, stretching as it moves.
+- Edit opens a Spaces screen where you can add, rename, delete and reorder tabs and choose the apps in each one.
+- An app can belong to any number of tabs.
+- The drawer tabs and the app options menu follow your custom tabs.
+- Existing Work, Personal and Tools assignments carry over.
+
 ### v1.1.35 — A widget grid and nine animated widgets
 
 Home, Plan, Your space and custom pages now lay widgets out on a 4-column grid. 2×2 widgets sit side by side, and wider widgets span the row. You can drag a widget anywhere on the grid, including across columns. The clock is a 2×2 widget without a background; tapping it opens your alarms. The weather is a 2×2 card with its animated sky and the live temperature, and it can be resized to a 4×2 card that adds the UV index. The Tasks and Space apps widgets no longer show a title. Every widget list shows each widget’s size (for example 2×2 or 4×2) next to its name, and resize options list the grid size too.

@@ -28,16 +28,6 @@ import com.example.launcher.data.InstalledApp
 import com.example.launcher.ui.Glyph
 import kotlinx.coroutines.delay
 
-internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:String,tab:String):List<InstalledApp> = apps.filter { app ->
-    val key=app.component.flattenToString()
-    app.label.contains(query.trim(),true) && when(tab) {
-        "Work" -> key in config.work
-        "Personal" -> key in config.personal
-        "Tools" -> key in config.tools
-        else -> true
-    }
-}
-
 @Composable internal fun FluidDrawer(state:FluidState,badges:Set<String>,query:String,search:(String)->Unit,tab:String,selectTab:(String)->Unit,focusSearch:Boolean,ready:Boolean,inputReady:Boolean,
     launch:(InstalledApp,Rect)->Unit,options:(InstalledApp)->Unit,close:()->Unit,settings:()->Unit,pull:(Float)->Unit,finishPull:(Float)->Unit) {
     val requester=remember{FocusRequester()}
@@ -46,7 +36,8 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     var pullDistance by remember{mutableFloatStateOf(0f)}
     LaunchedEffect(ready,focusSearch,inputReady){if(ready && focusSearch && inputReady){requester.requestFocus();keyboard?.show()}}
     LaunchedEffect(query,tab){grid.scrollToItem(0)}
-    val filtered=remember(state.apps,state.config.work,state.config.personal,state.config.tools,query,tab){fluidFilteredApps(state.apps,state.config,query,tab)}
+    val space=state.config.spaces.find{it.name==tab}
+    val filtered=remember(state.apps,space,query){fluidFilteredApps(state.apps,query,space)}
     val favorites=remember(state.apps,state.config.favoriteApps){state.apps.filter { it.component.flattenToString() in state.config.favoriteApps }.take(4)}
     Column(Modifier.fillMaxSize().imePadding().testTag("fluid-app-drawer")) {
         Box(Modifier.fillMaxWidth().height(8.dp).pointerInput(Unit){detectVerticalDragGestures(onDragStart={pullDistance=0f},onVerticalDrag={change,y->change.consume();pullDistance=(pullDistance+y).coerceAtLeast(0f);pull(pullDistance)},onDragEnd={finishPull(pullDistance)},onDragCancel={finishPull(0f)})})
@@ -56,20 +47,20 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                 colors=TextFieldDefaults.colors(focusedContainerColor=Color.Transparent,unfocusedContainerColor=Color.Transparent,focusedIndicatorColor=Color.Transparent,unfocusedIndicatorColor=Color.Transparent,cursorColor=F.purple,focusedTextColor=F.ink,unfocusedTextColor=F.ink))
             GlassIcon("settings","Drawer settings",Modifier.size(40.dp),onClick=settings)
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            listOf("All" to "All","Work" to "Work","Play" to "Personal","Tools" to "Tools").forEach { (label,name) ->
-                val selected=name==tab
-                Box(Modifier.height(30.dp).widthIn(min=if(label=="All")34.dp else 46.dp).clip(CircleShape).then(if(selected)Modifier.background(Brush.linearGradient(listOf(F.lilac,F.purple)))else Modifier.glass(20.dp)).clickable(role=Role.Tab){selectTab(name)}.semantics{this.selected=selected}.padding(horizontal=10.dp),contentAlignment=Alignment.Center){Text(label,style=F.text(9,true),color=if(selected)Color.White else F.ink)}
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=18.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            (listOf("All")+state.config.spaces.map{it.name}).forEach { label ->
+                val selected=label==(space?.name ?: "All")
+                Box(Modifier.height(30.dp).widthIn(min=if(label=="All")34.dp else 46.dp).clip(CircleShape).then(if(selected)Modifier.background(Brush.linearGradient(listOf(F.lilac,F.purple)))else Modifier.glass(20.dp)).clickable(role=Role.Tab){selectTab(label)}.semantics{this.selected=selected}.padding(horizontal=10.dp),contentAlignment=Alignment.Center){Text(label,style=F.text(9,true),color=if(selected)Color.White else F.ink,maxLines=1)}
             }
         }
         LazyVerticalGrid(GridCells.Fixed(4),Modifier.weight(1f).fillMaxWidth().testTag("fluid-app-grid"),state=grid,contentPadding=PaddingValues(start=18.dp,end=18.dp,bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+30.dp),verticalArrangement=Arrangement.spacedBy(14.dp),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
-            if(query.isBlank() && tab=="All" && favorites.isNotEmpty()) {
+            if(query.isBlank() && space==null && favorites.isNotEmpty()) {
                 item(span={GridItemSpan(4)}) { Text("Favorites",style=F.text(11,muted=true),modifier=Modifier.padding(top=2.dp,bottom=4.dp)) }
                 item(span={GridItemSpan(4)}) { Row(Modifier.fillMaxWidth().glass(28.dp).padding(horizontal=7.dp,vertical=5.dp)) { favorites.forEach { app -> FluidAppTile(app,badges,state.config.labels,launch,options,Modifier.weight(1f)) };repeat(4-favorites.size){Spacer(Modifier.weight(1f))} } }
                 item(span={GridItemSpan(4)}) { Text("All apps",style=F.text(11,muted=true),modifier=Modifier.padding(top=10.dp,bottom=1.dp)) }
             }
             if(filtered.isEmpty())item(span={GridItemSpan(4)}) {
-                Column(Modifier.fillMaxWidth().padding(top=48.dp),horizontalAlignment=Alignment.CenterHorizontally){Glyph("app",F.purple,Modifier.size(34.dp));Text(if(state.loading)"Finding your apps…"else if(query.isNotBlank())"No matching apps"else "Make this space yours",style=F.text(17,true),modifier=Modifier.padding(top=18.dp));Text(if(tab=="Work"||tab=="Personal")"Hold any app in All to assign a space."else "Your installed apps will appear here.",style=F.text(12,muted=true),modifier=Modifier.padding(top=8.dp))}
+                Column(Modifier.fillMaxWidth().padding(top=48.dp),horizontalAlignment=Alignment.CenterHorizontally){Glyph("app",F.purple,Modifier.size(34.dp));Text(if(state.loading)"Finding your apps…"else if(query.isNotBlank())"No matching apps"else "Make this space yours",style=F.text(17,true),modifier=Modifier.padding(top=18.dp));Text(if(space!=null)"Hold any app in All to add it to ${space.name}."else "Your installed apps will appear here.",style=F.text(12,muted=true),modifier=Modifier.padding(top=8.dp))}
             }
             items(filtered,key={it.component.flattenToString()}){app-> FluidAppTile(app,badges,state.config.labels,launch,options,Modifier.animateItem().fillMaxWidth())}
         }
@@ -83,9 +74,10 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
             Row(verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=dismiss);if(app.artwork!=null)Image(app.artwork.asImageBitmap(),null,Modifier.size(42.dp).padding(start=12.dp));Text(app.label,style=F.text(22,true),modifier=Modifier.weight(1f).padding(horizontal=12.dp),maxLines=2);GlassIcon("close","Close app options",Modifier.size(36.dp),onClick=dismiss)}
             Spacer(Modifier.height(10.dp))
             OptionRow("app",if(key in state.config.favoriteApps)"Remove from favorites"else"Add to favorites"){model.toggleFavoriteApp(key);dismiss()}
-            OptionRow("files",if(key in state.config.work)"Remove from Work"else"Add to Work"){model.assign(app,if(key in state.config.work)"None"else"Work");dismiss()}
-            OptionRow("contacts",if(key in state.config.personal)"Remove from Personal"else"Add to Personal"){model.assign(app,if(key in state.config.personal)"None"else"Personal");dismiss()}
-            OptionRow("settings",if(key in state.config.tools)"Remove from Tools"else"Add to Tools"){model.assign(app,if(key in state.config.tools)"None"else"Tools");dismiss()}
+            state.config.spaces.forEach { space ->
+                val inside=key in space.apps
+                OptionRow("files",if(inside)"Remove from ${space.name}" else "Add to ${space.name}"){model.toggleSpaceApp(space.id,key);dismiss()}
+            }
             val dock=fluidDock(state.apps,state.config.dock).take(if(state.config.dock==listOf("@auto")) state.config.dockCount else 6).map{it.component.flattenToString()}
             OptionRow("plus",if(key in dock)"Remove from dock"else"Add to dock"){
                 model.toggleDock(key);dismiss()
@@ -102,11 +94,11 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).clickable(role=Role.Button,onClick=click).padding(vertical=13.dp,horizontal=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {Glyph(glyph,F.purple,Modifier.size(21.dp));Text(title,style=F.text(13))}
 }
 
-@Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit,back:()->Unit) {
+@Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit,back:()->Unit,spaceStart:Long?=null) {
     val customizePage=name.removePrefix("Customize:").takeIf { name.startsWith("Customize:") } ?: "Home"
     Box(Modifier.fillMaxSize().background(Color(0xFF40315E).copy(alpha=.08f)).statusBarsPadding().padding(top=10.dp)) {
         Column(Modifier.fillMaxSize().glass(36.dp,strength=1.15f).testTag("fluid-panel-$name")) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=back);Column(Modifier.weight(1f).padding(start=13.dp)){Text(if(name.startsWith("Customize:"))"Customize $customizePage" else name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Apps that belong together";"Settings"->"Make it feel like you";else->"Widgets and layout for this page"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
+            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=back);Column(Modifier.weight(1f).padding(start=13.dp)){Text(if(name.startsWith("Customize:"))"Customize $customizePage" else name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Tabs and the apps in them";"Settings"->"Make it feel like you";else->"Widgets and layout for this page"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                 when(name) {
                     "Widgets", "Space widgets" -> {
@@ -118,27 +110,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             }
                         }
                     }
-                    "Spaces" -> {
-                        Text("Hold an app in the drawer for more options, or assign it here.",style=F.text(13,muted=true))
-                        state.apps.forEach { app ->
-                            val key=app.component.flattenToString()
-                            Column(Modifier.fillMaxWidth().glass(23.dp).padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                                Row(verticalAlignment=Alignment.CenterVertically) {
-                                    if(app.artwork!=null)Image(app.artwork.asImageBitmap(),null,Modifier.size(32.dp))
-                                    Text(app.label,style=F.text(13,true),modifier=Modifier.weight(1f).padding(start=10.dp),maxLines=1,overflow=TextOverflow.Ellipsis)
-                                }
-                                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                    listOf("Work","Personal","Tools").forEach { space ->
-                                        val selected=key in when(space){"Work"->state.config.work;"Personal"->state.config.personal;else->state.config.tools}
-                                        Box(Modifier.weight(1f).heightIn(min=42.dp).glass(18.dp).background(if(selected)F.purple.copy(alpha=.15f)else Color.Transparent)
-                                            .clickable(role=Role.RadioButton){model.assign(app,if(selected)"None"else space)}.semantics{this.selected=selected}.padding(vertical=10.dp),contentAlignment=Alignment.Center) {
-                                            Text(space,style=F.text(11,true),maxLines=1)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    "Spaces" -> SpaceTabsEditor(state,model,spaceStart)
                     "Wallpaper" -> { WallpaperSettings(state,model) }
                     "Dock" -> { DockSettings(state, model) }
                     "Market & news settings" -> { MarketNewsSettings(state, model) }
