@@ -126,7 +126,7 @@ private suspend fun ScrollState.reveal(range: ClosedFloatingPointRange<Float>, m
     }
 }
 
-@Composable private fun fieldColors() = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent,
+@Composable internal fun fieldColors() = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent, cursorColor = F.purple, focusedTextColor = F.ink, unfocusedTextColor = F.ink)
 
 @Composable private fun GlassField(value: String, change: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier, glyph: String? = null, done: () -> Unit = {}) {

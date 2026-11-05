@@ -34,6 +34,7 @@ import kotlin.math.*
 val LocalWeatherLocate = staticCompositionLocalOf<()->Unit> { {} }
 val LocalContactsAccess = staticCompositionLocalOf<()->Unit> { {} }
 val LocalSpaceWidgetGallery = staticCompositionLocalOf<()->Unit> { {} }
+val LocalClockPanel = staticCompositionLocalOf<(String)->Unit> { {} }
 val LocalWidgetEdit = staticCompositionLocalOf<(FluidWidget)->Unit> { {} }
 internal val LocalPageEdit = staticCompositionLocalOf<PageEdit?> { null }
 /** Shared with the page surface so content-level press anchors still light the full page. */

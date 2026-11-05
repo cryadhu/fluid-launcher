@@ -94,11 +94,11 @@ import kotlinx.coroutines.delay
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).clickable(role=Role.Button,onClick=click).padding(vertical=13.dp,horizontal=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {Glyph(glyph,F.purple,Modifier.size(21.dp));Text(title,style=F.text(13))}
 }
 
-@Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit,back:()->Unit,spaceStart:Long?=null) {
+@Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit,back:()->Unit,spaceStart:Long?=null,clockStart:String?=null) {
     val customizePage=name.removePrefix("Customize:").takeIf { name.startsWith("Customize:") } ?: "Home"
     Box(Modifier.fillMaxSize().background(Color(0xFF40315E).copy(alpha=.08f)).statusBarsPadding().padding(top=10.dp)) {
         Column(Modifier.fillMaxSize().glass(36.dp,strength=1.15f).testTag("fluid-panel-$name")) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=back);Column(Modifier.weight(1f).padding(start=13.dp)){Text(if(name.startsWith("Customize:"))"Customize $customizePage" else name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Tabs and the apps in them";"Settings"->"Make it feel like you";else->"Widgets and layout for this page"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
+            Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){GlassIcon("back","Back",onClick=back);Column(Modifier.weight(1f).padding(start=13.dp)){Text(if(name.startsWith("Customize:"))"Customize $customizePage" else name,style=F.text(23,true));Text(when(name){"Widgets"->"Little windows into your day";"Space widgets"->"Widgets for your space";"Spaces"->"Tabs and the apps in them";"Clock"->"Alarms, world time, stopwatch and timer";"Settings"->"Make it feel like you";else->"Widgets and layout for this page"},style=F.text(11,muted=true))};GlassIcon("close","Close panel",onClick=close)}
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()+24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                 when(name) {
                     "Widgets", "Space widgets" -> {
@@ -111,6 +111,7 @@ import kotlinx.coroutines.delay
                         }
                     }
                     "Spaces" -> SpaceTabsEditor(state,model,spaceStart)
+                    "Clock" -> ClockPanel(state,model,clockStart)
                     "Wallpaper" -> { WallpaperSettings(state,model) }
                     "Dock" -> { DockSettings(state, model) }
                     "Market & news settings" -> { MarketNewsSettings(state, model) }

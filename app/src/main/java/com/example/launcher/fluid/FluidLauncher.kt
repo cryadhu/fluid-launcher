@@ -183,12 +183,13 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     }
     var handledHomeEpoch by rememberSaveable { mutableIntStateOf(state.homeEpoch) }
     LaunchedEffect(state.homeEpoch) { if(state.homeEpoch>0 && state.homeEpoch!=handledHomeEpoch) { handledHomeEpoch=state.homeEpoch; drawerGesture=null; widgetEdit=null; pageEdits.values.forEach{it.close()}; pageEdit=null; drawer=false; appMenu=null; panel=null; hero.kind=null; hero.expanded=false; search=""; launching=null; focus.clearFocus(); keyboard?.hide(); pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.9f,320f)) } }
+    LaunchedEffect(state.panelRequest) { state.panelRequest?.let { showPanel(it); model.requestPanel(null) } }
     BackHandler {
         when { pageEdit!=null -> finishPageEdit(); resizeEditor!=null -> resizeEditor=null; widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panelBack(); drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
     }
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
-    CompositionLocalProvider(LocalSpaceApps provides SpaceAppsHost(badges,::launch,{ id -> showPanel(if(id==null)"Spaces" else "Spaces:$id") }),LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
+    CompositionLocalProvider(LocalSpaceApps provides SpaceAppsHost(badges,::launch,{ id -> showPanel(if(id==null)"Spaces" else "Spaces:$id") }),LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalClockPanel provides { tab -> showPanel("Clock:$tab") },LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }.routePageDrags(pageEdits)) {
         FluidWallpaper(Modifier.blur(editBlur))
         if(editBlur>0.dp) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=editBlur.value/16f*.10f)))
@@ -234,7 +235,8 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                 (fadeIn(tween(210))+slideInHorizontally(spring(.95f,350f)){it/10}) togetherWith (fadeOut(tween(130))+slideOutHorizontally(tween(190)){-it/16})
             },label="Glass panel navigation") { name ->
                 val spaceStart=if(name.startsWith("Spaces:")) name.removePrefix("Spaces:").toLongOrNull() else null
-                FluidPanel(if(name.startsWith("Spaces:"))"Spaces" else name,state,model,chooseHome,{panel=null},::navigatePanel,calendarAccess,activityAccess,::panelBack,spaceStart)
+                val clockStart=if(name.startsWith("Clock:")) name.removePrefix("Clock:") else null
+                FluidPanel(if(name.startsWith("Spaces:"))"Spaces" else if(clockStart!=null)"Clock" else name,state,model,chooseHome,{panel=null},::navigatePanel,calendarAccess,activityAccess,::panelBack,spaceStart,clockStart)
             }
         }
         AnimatedVisibility(appMenu!=null,enter=fadeIn(tween(110))+scaleIn(spring(.75f,450f),initialScale=.9f),exit=fadeOut(tween(100))+scaleOut(tween(130),targetScale=.96f)) {
@@ -293,9 +295,10 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     val fixed=widgetFixedHeight(kind)?.let { if(kind==FluidWidget.CLOCK && widgetSize(kind,state.config)=="Large") 240.dp else it }
     val opensDetail=kind==FluidWidget.WEATHER || fixed==null && kind!=FluidWidget.TASKS && kind!=FluidWidget.AGENDA && kind!=FluidWidget.SPACE_APPS
     val surface=if(kind==FluidWidget.MUSIC_OPEN || kind==FluidWidget.CLOCK) Modifier else Modifier.glass(30.dp,true)
+    val openClock=LocalClockPanel.current
     val click={ when {
         kind==FluidWidget.AGENDA -> model.open(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR))
-        kind==FluidWidget.CLOCK -> model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
+        kind==FluidWidget.CLOCK -> openClock("Alarm")
         opensDetail -> hero.open(kind,source)
     } }
     val size=if(fixed!=null) Modifier.height(fixed).clip(RoundedCornerShape(30.dp)) else Modifier.animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp)

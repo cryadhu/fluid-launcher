@@ -21,6 +21,12 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.flash" android:required="false"/>
     <queries>
@@ -52,6 +58,17 @@
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>
+        <activity android:name=".fluid.AlarmActivity" android:exported="false" android:theme="@style/Theme.Launcher.Alarm" android:showWhenLocked="true" android:turnScreenOn="true"
+            android:launchMode="singleTask" android:taskAffinity="${applicationId}.alarm" android:excludeFromRecents="true"/>
+        <receiver android:name=".fluid.ClockReceiver" android:exported="false"/>
+        <receiver android:name=".fluid.ClockBootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.TIME_SET"/>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
+            </intent-filter>
+        </receiver>
         <activity-alias android:name="${applicationId}.Setup" android:targetActivity=".MainActivity"
             android:enabled="true" android:exported="true" android:label="Fluid Launcher" android:icon="@mipmap/ic_fluid">
             <intent-filter>

@@ -42,6 +42,8 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null && isHomeOrSetupIntent(intent)) {
             model.returnHome()
         }
+        if (savedInstanceState == null) openRequestedPanel(intent)
+        com.example.launcher.fluid.ClockStore.get(this).reschedule()
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         setContent { val state by model.state.collectAsStateWithLifecycle(); com.example.launcher.fluid.FluidTheme(state.config) { com.example.launcher.fluid.FluidLauncher(model, ::chooseHome) } }
     }
@@ -73,7 +75,10 @@ class MainActivity : ComponentActivity() {
             model.returnHome()
             requestHomeOnResume = true
         }
+        openRequestedPanel(intent)
     }
+    private fun openRequestedPanel(intent: Intent) { intent.getStringExtra(EXTRA_PANEL)?.let { model.requestPanel(it); intent.removeExtra(EXTRA_PANEL) } }
+    companion object { const val EXTRA_PANEL = "com.cry.fluid.PANEL" }
     private fun isHomeOrSetupIntent(intent: Intent) = intent.action == Intent.ACTION_MAIN &&
         (intent.hasCategory(Intent.CATEGORY_HOME) || intent.hasCategory(Intent.CATEGORY_LAUNCHER) || intent.component?.className == "$packageName.Setup")
     private fun syncSetupEntry() { runCatching { HomeSetup.syncSetupEntry(this) } }

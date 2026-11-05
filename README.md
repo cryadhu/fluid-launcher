@@ -506,6 +506,14 @@ A dragged widget now floats above the pages in its own overlay, so it stays unde
 
 Rearranging no longer shows a top bar with a Done button. Hold a widget, drag it, and let go: once the card settles into its slot, or is dropped on the bin, the page leaves edit mode by itself. The bin button is now drawn above the floating card, so it stays visible while you drag onto it. While a widget is being dragged, the dock and the page indicator blur along with the wallpaper. The weather widget always shows the real forecast; the "Cycle animation" preview button is gone. The Work / Personal / Tools app tabs on Your space are now a regular "Space apps" widget that can be reordered, moved to another page or removed; existing setups get it added to the top of the Space page.
 
+### v1.1.37 — A Clock of its own
+
+Tapping the clock widget now opens a Clock screen inside the launcher instead of the system clock app. It has four tabs, and a glass pill slides between them.
+- **Alarm**: create alarms with a scrolling hour and minute wheel (AM/PM in 12-hour mode), repeat days and a label. Turn them on or off with a switch, tap one to edit it, or delete it. Alarms ring full screen over the lock screen, can be snoozed for 10 minutes, and are rescheduled after a restart or a time-zone change. The screen shows how long until the next alarm, and asks for notification, exact-alarm and full-screen access if any is missing.
+- **World clock**: your local time plus the cities you choose. Search to add a city and remove the ones you don't need. The World clocks widget uses the same cities and opens this tab.
+- **Stopwatch**: start, pause, resume and reset, with laps. The fastest lap is highlighted in purple and the slowest in orange.
+- **Timer**: enter a time on the keypad or pick a preset (1–30 min), then pause, resume, add a minute or reset. When it ends it rings like an alarm, with Stop and +1 min.
+
 ### v1.1.36 — Editable Space apps tabs
 
 - The Space apps widget lines its tabs up on the left and keeps an Edit icon fixed on the right.

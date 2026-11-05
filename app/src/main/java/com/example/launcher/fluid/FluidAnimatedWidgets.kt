@@ -212,10 +212,13 @@ private fun dayPart(hour: Int) = when (hour) { in 5..11 -> "Morning"; in 12..16 
 
 @Composable internal fun WorldClocksWidget(state: FluidState, model: FluidModel) {
     val local = ZoneId.systemDefault()
-    val others = listOf("Europe/London", "America/New_York", "Asia/Tokyo").map(ZoneId::of).filter { it.rules != local.rules }.take(2)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val zones by remember { ClockStore.get(context) }.state.collectAsState()
+    val openClock = LocalClockPanel.current
+    val others = zones.zones.map(ZoneId::of).filter { it.rules != local.rules }.take(2)
     val blink = state.now / 1000 % 2 == 0L
     val formatter = DateTimeFormatter.ofPattern("HH mm", Locale.getDefault())
-    Row(Modifier.fillMaxSize().tap(role = Role.Button) { model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)) }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxSize().tap(role = Role.Button) { openClock("World clock") }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         (listOf(local) + others).forEach { zone ->
             val time = Instant.ofEpochMilli(state.now).atZone(zone)
             val part = dayPart(time.hour)

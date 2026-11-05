@@ -92,7 +92,7 @@ data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<In
     val device: DeviceState = DeviceState(), val now: Long = System.currentTimeMillis(), val homeEpoch: Int = 0, val wallpaperApplying:Boolean=false,
     val tasks: List<FluidTask> = emptyList(), val weather: HomeWeather? = null, val weatherLoading: Boolean = false,
     val weatherError: String? = null, val storageUsed: Long = 0, val storageTotal: Long = 1, val message: String? = null,
-    val steps: Int? = null, val standHours: Int = 0, val water: Int = 0, val focusEnd: Long? = null, val focusLeft: Long = FOCUS_LENGTH)
+    val steps: Int? = null, val standHours: Int = 0, val water: Int = 0, val focusEnd: Long? = null, val focusLeft: Long = FOCUS_LENGTH, val panelRequest: String? = null)
 internal const val FOCUS_LENGTH = 25 * 60_000L
 internal const val WATER_GOAL = 8
 
@@ -120,6 +120,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         viewModelScope.launch { while (isActive) { delay(1000); mutable.update { it.copy(now = System.currentTimeMillis()) }; finishFocusIfDue() } }
     }
     fun returnHome() { mutable.update { it.copy(homeEpoch = it.homeEpoch + 1) } }
+    fun requestPanel(name: String?) { mutable.update { it.copy(panelRequest = name) } }
     fun tick() { mutable.update { it.copy(now = System.currentTimeMillis()) }; refreshDevice(); startSteps(); if(System.currentTimeMillis()-lastWeatherAttempt>15*60_000L)refreshWeather() }
     fun refreshApps() { appsJob?.cancel(); appsJob = viewModelScope.launch {
         try { val apps = device.apps(nativeIcons = true); mutable.update { it.copy(apps = apps, loading = false) } }

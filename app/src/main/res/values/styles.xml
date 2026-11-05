@@ -9,6 +9,11 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+    <style name="Theme.Launcher.Alarm" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#120E22</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
     <style name="Animation.LauncherHome" parent="@android:style/Animation.Activity">
         <item name="android:activityOpenEnterAnimation">@anim/home_stationary</item>
         <item name="android:activityOpenExitAnimation">@anim/home_stationary</item>
