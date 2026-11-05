@@ -72,7 +72,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     val dragRoute=remember { DragRoute() }
     fun editFor(page:String):PageEdit = pageEdits.getOrPut(page) {
         lateinit var created:PageEdit
-        created = PageEdit(page,model,scope,
+        created = PageEdit(page,model,scope,dragRoute,
             onActivated = {
                 pageEdits.values.filter { it !== created }.forEach { it.close() }
                 pageEdit = page
@@ -89,23 +89,18 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                     editFor(target).enter()
                 }
             },
-            onHandoff = { kind, target, grab ->
-                dragRoute.released = false
-                dragRoute.carrying = true
+            onHandoff = { kind, target, at, grab, height ->
                 val dest = editFor(target)
-                dest.forget(kind)
+                dest.receive(kind, page, at, grab, height)
                 scope.launch {
-                    try {
-                        val index = model.state.value.config.pages.indexOf(target)
-                        if (index >= 0) {
-                            snapshotFlow { pager.pageCount }.first { it > index }
-                            pager.animateScrollToPage(index, animationSpec = spring(.92f, 420f))
-                        }
-                        withTimeoutOrNull(700) { snapshotFlow { dest.cards[kind] }.first { it != null } }
-                        withFrameNanos { }
-                        if (dragRoute.released) dest.enter() else dest.carry(kind, dragRoute.pointer, grab)
-                        pageEdit = target
-                    } finally { dragRoute.carrying = false }
+                    val index = model.state.value.config.pages.indexOf(target)
+                    if (index >= 0) {
+                        snapshotFlow { pager.pageCount }.first { it > index }
+                        pager.animateScrollToPage(index, animationSpec = spring(.92f, 420f))
+                    }
+                    withTimeoutOrNull(700) { snapshotFlow { dest.cards[kind] }.first { it != null } }
+                    withFrameNanos { }
+                    dest.land(kind)
                 }
             })
         created
@@ -191,12 +186,12 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
     val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
     CompositionLocalProvider(LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
-    Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }.routePageDrags(pageEdits,dragRoute)) {
+    Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }.routePageDrags(pageEdits)) {
         FluidWallpaper(Modifier.blur(editBlur))
         if(editBlur>0.dp) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=editBlur.value/16f*.10f)))
         Box(Modifier.fillMaxSize().blur(panelBlur)) {
-            HorizontalPager(pager,Modifier.fillMaxSize().graphicsLayer { scaleX=1f-drawerProgress*.055f; scaleY=scaleX; alpha=1f-drawerProgress*.48f }.blur((drawerProgress*18).dp)
-                .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null && !dragRoute.carrying && pageEdits.values.none{it.dragging!=null}) { index ->
+            HorizontalPager(pager,beyondViewportPageCount=if(editing) 1 else 0,modifier=Modifier.fillMaxSize().graphicsLayer { scaleX=1f-drawerProgress*.055f; scaleY=scaleX; alpha=1f-drawerProgress*.48f }.blur((drawerProgress*18).dp)
+                .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null && pageEdits.values.none{it.dragging!=null}) { index ->
                 val distance = ((pager.currentPage-index)+pager.currentPageOffsetFraction).absoluteValue.coerceAtMost(1f)
                 val currentPage=state.config.pages[index]
                 val pagePress=remember { MutableInteractionSource() }
@@ -229,6 +224,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
         }
         FluidHeroOverlay(hero,state,model,calendarAccess,activityAccess)
         activeEdit?.let { PageEditOverlay(it,finishPageEdit) }
+        DragGhost(dragRoute,pageEdits)
         AnimatedVisibility(panel!=null,enter=fadeIn(spring(stiffness=350f))+slideInVertically(spring(.9f,350f)){it/6},exit=fadeOut(tween(180))+slideOutVertically(tween(240)){it/5}) {
             AnimatedContent(targetState=panel ?: lastPanel,transitionSpec={
                 (fadeIn(tween(210))+slideInHorizontally(spring(.95f,350f)){it/10}) togetherWith (fadeOut(tween(130))+slideOutHorizontally(tween(190)){-it/16})

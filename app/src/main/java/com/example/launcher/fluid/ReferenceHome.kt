@@ -155,12 +155,12 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     val temp=weather?.temperature?.roundToInt()?.let{"$it\u00b0"} ?: "--\u00b0"
     Box(modifier.combinedClickable(onClick=click,onLongClick=hold).semantics{contentDescription="Weather $temp ${weather?.condition ?: "Choose city"}"}) {
         Canvas(Modifier.fillMaxSize()) {
-            val x=size.width*.32f;val y=size.height*.47f;val u=size.minDimension
+            val x=size.width*.34f;val y=size.height*.46f;val u=size.minDimension
             val sway=drift.dp.toPx()
             val withCloud=cloudy || weather==null
             if(sunny) {
-                val c=if(withCloud) Offset(x+u*.13f,y-u*.13f) else Offset(x,y)
-                val r=u*(if(withCloud) .13f else .16f)
+                val c=if(withCloud) Offset(x+u*.11f,y-u*.11f) else Offset(x,y)
+                val r=u*(if(withCloud) .11f else .16f)
                 drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE3A5).copy(alpha=.75f),Color(0xFFFFE3A5).copy(alpha=0f)),c,r*2.4f),r*2.4f,c)
                 rotate(spin,c) {
                     repeat(12){i->
@@ -176,7 +176,7 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                 drawCircle(Brush.radialGradient(listOf(Color(0xFFFFF4CF),Color(0xFFFFC566)),c-Offset(r*.3f,r*.3f),r*1.3f),r,c)
             }
             if(night) {
-                val c=if(withCloud) Offset(x+u*.12f,y-u*.14f) else Offset(x,y)
+                val c=if(withCloud) Offset(x+u*.10f,y-u*.12f) else Offset(x,y)
                 val r=u*.15f
                 drawCircle(Brush.radialGradient(listOf(Color(0xFFD6E5EF).copy(alpha=.35f),Color.Transparent),c,r*2.2f),r*2.2f,c)
                 val moon=Path().apply{addOval(Rect(c,r))}
@@ -195,28 +195,28 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                     snow->Color(0xFFF7F9FC) to Color(0xFFC2CFDC)
                     else->Color.White to Color(0xFFD3DEE9)
                 }
-                if(wet || snow || fog || code==3) cloud(Offset(x+u*.17f-sway*.6f,y-u*.11f),u*.52f,lerp(top,bottom,.35f),bottom,.92f)
+                if(wet || snow || fog || code==3) cloud(Offset(x+u*.14f-sway*.6f,y-u*.09f),u*.42f,lerp(top,bottom,.35f),bottom,.92f)
                 val flash=if(thunder) thunderFlash(cycle) else 0f
-                cloud(Offset(x+sway,y),u*.78f,lerp(top,Color.White,flash*.5f),bottom,1f)
+                cloud(Offset(x+sway,y),u*.62f,lerp(top,Color.White,flash*.5f),bottom,1f)
             }
             if(wet) {
                 val count=if(thunder) 6 else 8
                 repeat(count){i->
                     val p=(rain*(if(i%2==0)1f else .85f)+i*.37f)%1f
-                    val px=x-u*.25f+i*u*(.5f/count)+sway
-                    val py=y+u*.16f+p*u*.34f
+                    val px=x-u*.2f+i*u*(.4f/count)+sway
+                    val py=y+u*.13f+p*u*.32f
                     raindrop(Offset(px-p*u*.04f,py),u,sin(p*PI.toFloat()))
                 }
             }
             if(snow) repeat(7){i->
                 val p=(cycle*(if(i%2==0)1f else .8f)+i*.29f)%1f
-                val px=x-u*.24f+i*u*.075f+sin((p*2f+i*.4f)*PI.toFloat())*4.dp.toPx()+sway
-                val py=y+u*.16f+p*u*.33f
+                val px=x-u*.19f+i*u*.062f+sin((p*2f+i*.4f)*PI.toFloat())*4.dp.toPx()+sway
+                val py=y+u*.13f+p*u*.31f
                 snowflake(Offset(px,py),(if(i%3==0)5.5f else if(i%3==1)4.2f else 3.4f).dp.toPx(),p*180f+i*40f,sin(p*PI.toFloat()).coerceIn(0f,1f))
             }
             if(thunder) {
                 val flash=thunderFlash(cycle)
-                val o=Offset(x+u*.02f+sway,y+u*.13f)
+                val o=Offset(x+u*.02f+sway,y+u*.10f)
                 val bolt=Path().apply {
                     moveTo(o.x+u*.05f,o.y);lineTo(o.x-u*.07f,o.y+u*.17f);lineTo(o.x-u*.005f,o.y+u*.17f)
                     lineTo(o.x-u*.06f,o.y+u*.33f);lineTo(o.x+u*.10f,o.y+u*.12f);lineTo(o.x+u*.03f,o.y+u*.12f)
@@ -261,7 +261,9 @@ private fun DrawScope.cloud(center:Offset,s:Float,top:Color,bottom:Color,alpha:F
         addOval(Rect(Offset(center.x+s*.03f,center.y-s*.08f),s*.24f))
         addOval(Rect(Offset(center.x+s*.26f,center.y+s*.04f),s*.15f))
     }
-    translate(0f,s*.035f){drawPath(shape,Color(0xFF29384A).copy(alpha=.10f*alpha))}
+    // A radial falloff squashed into an ellipse gives a soft contact shadow on every API level.
+    val shade=Offset(center.x+s*.03f,center.y+s*.24f)
+    scale(1f,.26f,shade){drawCircle(Brush.radialGradient(listOf(Color(0xFF29384A).copy(alpha=.20f*alpha),Color(0xFF29384A).copy(alpha=.07f*alpha),Color.Transparent),shade,s*.5f),s*.5f,shade)}
     drawPath(shape,Brush.verticalGradient(listOf(top,bottom),center.y-s*.32f,center.y+s*.22f),alpha=alpha)
     drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha=.55f*alpha),Color.White.copy(alpha=0f)),Offset(center.x-s*.02f,center.y-s*.18f),s*.2f),s*.2f,Offset(center.x-s*.02f,center.y-s*.18f))
 }

@@ -178,7 +178,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         return name
     }
     fun removePage(page:String)=configure { c -> if(page in listOf("Markets","Home"))c else c.copy(pages=c.pages-page) }
-    fun moveWidgetToPage(from:String,to:String,widget:FluidWidget,toFront:Boolean=true) {
+    fun moveWidgetToPage(from:String,to:String,widget:FluidWidget,before:FluidWidget?=null) {
         if(from==to)return
         fun FluidConfig.withPage(page:String,change:(List<FluidWidget>)->List<FluidWidget>):FluidConfig = when(page) {
             "Home"->copy(widgets=change(widgets));"Space"->copy(spaceWidgets=change(spaceWidgets));"Plan"->copy(planWidgets=change(planWidgets))
@@ -186,7 +186,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         }
         configure { c ->
             val removed=c.withPage(from){ it.filterNot{w->w==widget} }
-            removed.withPage(to){ list -> (if(toFront) listOf(widget)+list else list+widget).distinct() }
+            removed.withPage(to){ list -> val rest=list-widget; val at=before?.let{rest.indexOf(it)}?.takeIf{it>=0} ?: rest.size; rest.toMutableList().apply{add(at,widget)} }
         }
     }
     fun movePage(page:String,delta:Int)=configure { c -> val list=c.pages.toMutableList();val from=list.indexOf(page);val to=(from+delta).coerceIn(2,list.lastIndex);if(from>=2&&from!=to){list.removeAt(from);list.add(to,page)};c.copy(pages=list) }

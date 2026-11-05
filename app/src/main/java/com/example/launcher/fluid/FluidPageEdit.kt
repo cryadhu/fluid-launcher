@@ -20,8 +20,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -30,10 +38,12 @@ import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.zIndex
 import com.example.launcher.ui.Glyph
 import kotlinx.coroutines.Job
@@ -43,11 +53,13 @@ import kotlinx.coroutines.launch
 
 internal fun pageSupportsWidgets(page: String) = page != "Markets"
 
-/** Root-level pointer state shared while a dragged widget travels between pages. */
+/** The lifted widget is drawn by a root overlay from this layer, so it keeps floating under the
+ * finger while pages scroll beneath it. */
+@Stable
 internal class DragRoute {
-    var pointer = Offset.Zero
-    var carrying by mutableStateOf(false)
-    var released = false
+    var lifted by mutableStateOf<FluidWidget?>(null)
+    var at by mutableStateOf(Offset.Zero)
+    var layer: GraphicsLayer? = null
 }
 
 /** In-page rearrangement state. Widget cards stay in the real page layout, the dragged card
@@ -57,9 +69,10 @@ internal class PageEdit(
     val page: String,
     private val model: FluidModel,
     private val scope: kotlinx.coroutines.CoroutineScope,
+    val route: DragRoute = DragRoute(),
     private val onActivated: () -> Unit = {},
     private val onPageDropped: (String) -> Unit = {},
-    private val onHandoff: (FluidWidget, String, Offset) -> Unit = { _, _, _ -> }
+    private val onHandoff: (kind: FluidWidget, target: String, at: Offset, grab: Offset, height: Float) -> Unit = { _, _, _, _, _ -> }
 ) {
     var active by mutableStateOf(false)
         private set
@@ -78,7 +91,8 @@ internal class PageEdit(
         private set
     var newPageArmed by mutableStateOf(false)
         private set
-    var lag by mutableStateOf<Animatable<Offset, AnimationVector2D>?>(null)
+    /** A card handed over from another page whose slot is not yet measured at rest. */
+    var incoming by mutableStateOf<FluidWidget?>(null)
         private set
     var removeBounds by mutableStateOf(Rect.Zero)
     var viewport by mutableStateOf(Rect.Zero)
@@ -91,13 +105,13 @@ internal class PageEdit(
     private var visible: List<FluidWidget> = emptyList()
     private var spacingPx = 0f
     private var scroll: ScrollState? = null
+    private var grab = Offset.Zero
     private var pointer = Offset.Zero
+        set(value) { field = value; route.at = value - grab }
     private var autoScroll: Job? = null
     private var autoDirection = 0
     private var edgeJob: Job? = null
     private var edgeDirection = 0
-    private var grab = Offset.Zero
-    private var lagJob: Job? = null
 
     fun bind(widgets: List<FluidWidget>, spacing: Float, scrollState: ScrollState) {
         visible = widgets
@@ -132,33 +146,44 @@ internal class PageEdit(
         }
         dragging = kind
         drag = carrying
-        clearLag()
+        incoming = null
         overRemove = false
         val rect = cards[kind] ?: Rect.Zero
         grab = local
         pointer = rect.topLeft + carrying + local
+        route.lifted = kind
     }
 
-    /** Continues a drag that started on another page: the card glides from its new slot
-     * to the finger and then reorders against this page's widgets. */
-    fun carry(kind: FluidWidget, at: Offset, grabbed: Offset) {
-        val rect = cards[kind] ?: return
+    /** Takes over a drag from another page. The card goes straight into the slot under the
+     * finger, the cards below it slide down, and it keeps floating while this page scrolls in. */
+    fun receive(kind: FluidWidget, from: String, at: Offset, grabbed: Offset, height: Float) {
         if (!active) { active = true; onActivated() }
         stopAutoScroll()
         cancelEdge()
         settleJob?.cancel(); settleJob = null; settling = null; settle = null
-        dragging = kind
+        val old = visible - kind
+        val before = old.firstOrNull { w -> (cards[w]?.center?.y ?: Float.MAX_VALUE) > at.y }
+        val new = old.toMutableList().apply { add(before?.let { indexOf(it) } ?: size, kind) }
+        forget(kind)
+        heights[kind] = height
+        shift(old, new, kind)
+        visible = new
+        model.moveWidgetToPage(from, page, kind, before)
         grab = grabbed
         pointer = at
-        drag = at - grabbed - rect.topLeft
+        drag = Offset.Zero
         overRemove = false
-        val anim = Animatable(-drag, Offset.VectorConverter)
-        lagJob?.cancel()
-        lag = anim
-        lagJob = scope.launch {
-            anim.animateTo(Offset.Zero, spring(dampingRatio = .8f, stiffness = 520f))
-            if (lag === anim) lag = null
-        }
+        incoming = kind
+        dragging = kind
+        route.lifted = kind
+    }
+
+    /** Once this page has settled, anchor the floating card to its measured slot. */
+    fun land(kind: FluidWidget) {
+        if (incoming != kind || dragging != kind) return
+        incoming = null
+        val rect = cards[kind] ?: return
+        drag = pointer - grab - rect.topLeft
         maybeSwap(kind)
     }
 
@@ -171,8 +196,9 @@ internal class PageEdit(
 
     fun dragBy(delta: Offset) {
         val kind = dragging ?: return
-        drag += delta
         pointer += delta
+        if (incoming == kind) return
+        drag += delta
         overRemove = removeBounds.width > 0f && removeBounds.contains(pointer)
         maybeSwap(kind)
         autoScrollIfNeeded()
@@ -185,12 +211,13 @@ internal class PageEdit(
         val createPage = newPageArmed
         cancelEdge()
         dragging = null
-        val start = drag + (lag?.value ?: Offset.Zero)
-        clearLag()
+        val start = if (incoming == kind) cards[kind]?.let { pointer - grab - it.topLeft } ?: Offset.Zero else drag
+        incoming = null
         if (overRemove) {
             remove(kind)
             return
         }
+        route.lifted = null
         if (createPage) {
             val target = model.addPage()
             model.moveWidgetToPage(page, target, kind)
@@ -218,9 +245,10 @@ internal class PageEdit(
         cancelEdge()
         settleJob?.cancel()
         settleJob = null
-        clearLag()
+        if (dragging != null && route.lifted == dragging) route.lifted = null
         active = false
         dragging = null
+        incoming = null
         settling = null
         settle = null
         drag = Offset.Zero
@@ -245,6 +273,7 @@ internal class PageEdit(
             heights.remove(kind)
             cards.remove(kind)
             flips.remove(kind)
+            if (route.lifted == kind) route.lifted = null
             removing = null
             removeProgress.snapTo(1f)
         }
@@ -365,7 +394,7 @@ internal class PageEdit(
 
     private fun edgeDirectionNow(): Int {
         val vp = viewport
-        if (vp.width <= 0f) return 0
+        if (vp.width <= 0f || incoming != null) return 0
         val zone = vp.width * .12f
         val travel = vp.width * .065f
         return when {
@@ -377,7 +406,8 @@ internal class PageEdit(
 
     private fun handoff(kind: FluidWidget, target: String) {
         val grabbed = grab
-        val toFront = pointer.y < viewport.center.y
+        val at = pointer
+        val height = heights[kind] ?: 0f
         stopAutoScroll()
         edgeJob = null
         edgeDirection = 0
@@ -385,20 +415,12 @@ internal class PageEdit(
         dragging = null
         drag = Offset.Zero
         overRemove = false
-        clearLag()
         val old = visible
         val new = old - kind
         shift(old, new, kind)
         visible = new
         forget(kind)
-        model.moveWidgetToPage(page, target, kind, toFront)
-        onHandoff(kind, target, grabbed)
-    }
-
-    private fun clearLag() {
-        lagJob?.cancel()
-        lagJob = null
-        lag = null
+        onHandoff(kind, target, at, grabbed, height)
     }
 
     private fun cancelEdge() {
@@ -416,8 +438,9 @@ internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: St
     val measured = this.onGloballyPositioned {
         val height = it.size.height.toFloat()
         if (edit.heights[kind] != height) edit.heights[kind] = height
-        if (edit.dragging != kind) {
-            val rect = it.boundsInRoot()
+        if (edit.dragging != kind || edit.incoming == kind) {
+            // Unclipped, so a card on a page that is still off screen reports its real slot.
+            val rect = Rect(it.positionInRoot(), it.size.toSize())
             if (edit.cards[kind] != rect) edit.cards[kind] = rect
         }
     }
@@ -435,49 +458,54 @@ internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: St
     val flip = edit.flips[kind]
     val settle = if (edit.settling == kind) edit.settle else null
     return grip
-        .zIndex(if (edit.dragging == kind || edit.settling == kind || edit.removing == kind) 2f else 0f)
+        .zIndex(if (edit.settling == kind) 2f else 0f)
         .graphicsLayer {
-            val isDragging = edit.dragging == kind
-            val removingThis = edit.removing == kind
-            val live = when {
-                isDragging -> edit.drag + (edit.lag?.value ?: Offset.Zero)
-                settle != null -> settle.value
-                else -> Offset.Zero
-            }
+            val live = if (edit.dragging != kind && settle != null) settle.value else Offset.Zero
             translationX = live.x
             translationY = live.y + (flip?.value ?: 0f)
-            val scale = when {
-                removingThis -> edit.removeProgress.value
-                isDragging -> 1.035f
-                else -> 1f
-            }
-            scaleX = scale
-            scaleY = scale
-            rotationZ = 0f
-            alpha = if (removingThis) edit.removeProgress.value else 1f
         }
+        .drawWithContent {
+            val layer = edit.route.layer
+            if (edit.route.lifted == kind && layer != null) layer.record { this@drawWithContent.drawContent() } else drawContent()
+        }
+}
+
+/** Draws the lifted card above every page, the editor chrome and the bin. */
+@Composable
+internal fun DragGhost(route: DragRoute, edits: Map<String, PageEdit>) {
+    val layer = rememberGraphicsLayer()
+    DisposableEffect(layer) {
+        route.layer = layer
+        onDispose { if (route.layer === layer) route.layer = null }
+    }
+    Spacer(Modifier.fillMaxSize().drawBehind {
+        val kind = route.lifted ?: return@drawBehind
+        val removing = edits.values.firstOrNull { it.removing == kind }
+        val progress = removing?.removeProgress?.value ?: 1f
+        val scale = if (removing != null) progress else 1.035f
+        layer.alpha = progress
+        val pivot = Offset(layer.size.width / 2f, layer.size.height / 2f)
+        translate(route.at.x, route.at.y) { scale(scale, pivot) { drawLayer(layer) } }
+    })
 }
 
 /** Hit testing only happens on touch down, so a card that changes page mid-gesture can never
  * receive the pointer itself. The launcher root observes it instead and drives the live drag. */
-internal fun Modifier.routePageDrags(edits: Map<String, PageEdit>, route: DragRoute): Modifier = pointerInput(edits, route) {
+internal fun Modifier.routePageDrags(edits: Map<String, PageEdit>): Modifier = pointerInput(edits) {
     awaitPointerEventScope {
         var id: PointerId? = null
         while (true) {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             if (id == null) id = event.changes.firstOrNull { it.pressed && !it.previousPressed }?.id
             val change = event.changes.firstOrNull { it.id == id } ?: continue
-            route.pointer = change.position
             val edit = edits.values.firstOrNull { it.dragging != null }
             if (!change.pressed) {
                 id = null
-                if (edit != null) edit.end() else if (route.carrying) route.released = true
+                edit?.end()
                 continue
             }
             val delta = change.position - change.previousPosition
-            if (edit != null) {
-                if (delta != Offset.Zero) { change.consume(); edit.dragBy(delta) }
-            } else if (route.carrying) change.consume()
+            if (edit != null && delta != Offset.Zero) { change.consume(); edit.dragBy(delta) }
         }
     }
 }
@@ -511,30 +539,30 @@ internal fun BoxScope.PageEditOverlay(edit: PageEdit, onDone: () -> Unit) {
     }
     AnimatedVisibility(
         visible = edit.active,
-        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 42.dp),
+        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 42.dp),
         enter = slideInVertically(spring(dampingRatio = .8f, stiffness = 360f)) { it } + fadeIn(tween(140)),
         exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(120))
     ) {
         val hot = edit.overRemove
+        val lift by animateFloatAsState(if (hot) 1f else 0f, spring(dampingRatio = .6f, stiffness = 520f), label = "Bin hover")
+        val red = Color(0xFFE05B67)
         Box(
-            Modifier.fillMaxWidth().height(62.dp)
-                .onGloballyPositioned { edit.removeBounds = it.boundsInRoot() }
+            Modifier.size(width = 64.dp, height = 46.dp)
+                // The drop zone is a little larger than the button so it is easy to hit.
+                .onGloballyPositioned { edit.removeBounds = it.boundsInRoot().let { r -> r.inflate(r.height * .45f) } }
                 .graphicsLayer {
-                    val scale = if (hot) 1.015f else 1f
+                    val scale = 1f + lift * .16f
                     scaleX = scale
                     scaleY = scale
                 }
-                .glass(24.dp, true)
-                .background(Color(0xFFE05B67).copy(alpha = if (hot) .24f else .11f), RoundedCornerShape(24.dp))
-                .border(if (hot) 2.5.dp else 1.5.dp, Color(0xFFE05B67).copy(alpha = if (hot) 1f else .65f), RoundedCornerShape(24.dp))
+                .glass(16.dp, true)
+                .background(red.copy(alpha = .14f + lift * .86f), RoundedCornerShape(16.dp))
+                .border(1.5.dp, red.copy(alpha = .7f + lift * .3f), RoundedCornerShape(16.dp))
                 .testTag("widget-remove-target")
                 .semantics { stateDescription = if (hot) "Ready to remove" else "Drag here to remove" },
             contentAlignment = Alignment.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Glyph("bin", Color(0xFFE05B67), Modifier.size(22.dp))
-                Text(if (hot) "Release to remove" else "Drag here to remove", style = F.text(14, true), color = Color(0xFFE05B67), modifier = Modifier.padding(start = 9.dp))
-            }
+            Glyph("bin", lerp(red, Color.White, lift), Modifier.size(22.dp))
         }
     }
     AnimatedVisibility(
