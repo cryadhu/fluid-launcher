@@ -247,7 +247,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         prefs.edit().putString("tasks", JSONArray(tasks.map { JSONObject().put("id", it.id).put("text", it.text).put("done", it.done) }).toString()).apply()
     }
     fun weatherCity(city: String) { if (city.isBlank()) return; configure { it.copy(city = city.trim(),autoWeather=false) }; refreshWeather(true) }
-    fun cycleWeatherPreview() { mutable.update { it.copy(weatherPreview = (it.weatherPreview + 1) % 7) } }
+    fun cycleWeatherPreview() { mutable.update { it.copy(weatherPreview = (it.weatherPreview + 1) % 9) } }
     fun useWeatherLocation() { configure { it.copy(autoWeather=true) };refreshWeather(true) }
     fun refreshWeather(force: Boolean=false) {
         if(weatherJob?.isActive==true && !force)return

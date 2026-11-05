@@ -42,9 +42,9 @@ private data class WeatherPreview(val code:Int,val label:String,val day:Boolean,
 internal fun weatherForDisplay(state:FluidState):HomeWeather? {
     if(state.weatherPreview==0)return state.weather
     val preview=listOf(
-        WeatherPreview(0,"Sunny",true,5.0), WeatherPreview(3,"Cloudy",true,9.0), WeatherPreview(63,"Rainy",true,14.0),
+        WeatherPreview(0,"Sunny",true,5.0), WeatherPreview(3,"Cloudy",true,9.0), WeatherPreview(63,"Rainy",true,14.0), WeatherPreview(95,"Thunderstorm",true,18.0),
         WeatherPreview(71,"Snow",true,7.0), WeatherPreview(45,"Misty",true,5.0), WeatherPreview(2,"Windy",true,32.0), WeatherPreview(1,"Clear night",false,4.0)
-    )[state.weatherPreview]
+    )[state.weatherPreview-1]
     val base=state.weather ?: HomeWeather("Preview",22.0,preview.label,emptyList(),preview.code,preview.day,preview.wind)
     return base.copy(code=preview.code,condition=preview.label,isDay=preview.day,windSpeed=preview.wind)
 }
@@ -139,50 +139,105 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
 @Composable internal fun WeatherScene(state:FluidState,modifier:Modifier=Modifier,click:()->Unit={},hold:()->Unit={}) {
     val transition=rememberInfiniteTransition(label="Weather atmosphere")
     val drift by transition.animateFloat(-3f,3f,infiniteRepeatable(tween(3200,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="Cloud drift")
-    val rain by transition.animateFloat(0f,1f,infiniteRepeatable(tween(1400,easing=LinearEasing)),label="Rain fall")
+    val rain by transition.animateFloat(0f,1f,infiniteRepeatable(tween(1100,easing=LinearEasing)),label="Rain fall")
+    val cycle by transition.animateFloat(0f,1f,infiniteRepeatable(tween(4200,easing=LinearEasing)),label="Weather cycle")
+    val spin by transition.animateFloat(0f,360f,infiniteRepeatable(tween(30000,easing=LinearEasing)),label="Sun rays")
     val weather=weatherForDisplay(state)
     val code=weather?.code ?: -1
-    val wet=code in 51..67 || code in 80..82 || code in 95..99
+    val thunder=code in 95..99
+    val wet=code in 51..67 || code in 80..82 || thunder
     val snow=code in 71..77 || code in 85..86
     val fog=code==45 || code==48
     val night=weather?.isDay==false
     val windy=(weather?.windSpeed ?: 0.0)>=20
-    val cloudy=code in 1..3 || wet || snow || fog
+    val cloudy=code in 2..3 || wet || snow || fog
+    val sunny=weather!=null && !night && !fog && !wet && !snow && code!=3
     val temp=weather?.temperature?.roundToInt()?.let{"$it\u00b0"} ?: "--\u00b0"
     Box(modifier.combinedClickable(onClick=click,onLongClick=hold).semantics{contentDescription="Weather $temp ${weather?.condition ?: "Choose city"}"}) {
-        Canvas(Modifier.fillMaxSize().graphicsLayer{translationX=drift.dp.toPx()}) {
-            val x=size.width*.32f;val y=size.height*.47f;val unit=size.minDimension
-            if(weather!=null && !night && !fog && !wet && !snow && code!=3){
-                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE3A5),Color(0xFFFFE3A5).copy(alpha=.05f)),Offset(x,y),unit*.3f),unit*.3f,Offset(x,y))
-                drawCircle(Color(0xFFFFD38B),unit*.16f,Offset(x,y))
-            }
-            if(night){
-                val moon=Path().apply{addOval(Rect(x-unit*.17f,y-unit*.17f,x+unit*.17f,y+unit*.17f))}
-                val cut=Path().apply{addOval(Rect(x-unit*.05f,y-unit*.22f,x+unit*.25f,y+unit*.1f))}
-                drawPath(Path.combine(PathOperation.Difference,moon,cut),Color(0xFFD6E5EF))
-                repeat(4){i->drawCircle(Color.White.copy(alpha=.6f),1.3.dp.toPx(),Offset(x+unit*(i*.12f-.2f),y-unit*(.25f+i%2*.08f)))}
-            }
-            if(cloudy || weather==null){
-                val cloud=Path().apply {
-                    moveTo(x-unit*.28f,y+unit*.16f)
-                    cubicTo(x-unit*.43f,y+unit*.15f,x-unit*.43f,y-unit*.07f,x-unit*.27f,y-unit*.09f)
-                    cubicTo(x-unit*.24f,y-unit*.28f,x+unit*.02f,y-unit*.31f,x+unit*.10f,y-unit*.12f)
-                    cubicTo(x+unit*.25f,y-unit*.18f,x+unit*.35f,y-unit*.06f,x+unit*.32f,y+unit*.03f)
-                    cubicTo(x+unit*.47f,y+unit*.05f,x+unit*.43f,y+unit*.17f,x+unit*.30f,y+unit*.17f)
-                    lineTo(x-unit*.28f,y+unit*.16f);close()
+        Canvas(Modifier.fillMaxSize()) {
+            val x=size.width*.32f;val y=size.height*.47f;val u=size.minDimension
+            val sway=drift.dp.toPx()
+            val withCloud=cloudy || weather==null
+            if(sunny) {
+                val c=if(withCloud) Offset(x+u*.13f,y-u*.13f) else Offset(x,y)
+                val r=u*(if(withCloud) .13f else .16f)
+                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE3A5).copy(alpha=.75f),Color(0xFFFFE3A5).copy(alpha=0f)),c,r*2.4f),r*2.4f,c)
+                rotate(spin,c) {
+                    repeat(12){i->
+                        val a=Math.toRadians(i*30.0).toFloat();val spread=.075f
+                        val ray=Path().apply {
+                            moveTo(c.x+cos(a-spread)*r*1.28f,c.y+sin(a-spread)*r*1.28f)
+                            lineTo(c.x+cos(a)*r*(if(i%2==0)1.75f else 1.55f),c.y+sin(a)*r*(if(i%2==0)1.75f else 1.55f))
+                            lineTo(c.x+cos(a+spread)*r*1.28f,c.y+sin(a+spread)*r*1.28f);close()
+                        }
+                        drawPath(ray,Color(0xFFFFD27A).copy(alpha=.85f))
+                    }
                 }
-                val top=if(wet)Color(0xFFC1CCD7)else if(night)Color(0xFFD3DFE9)else Color(0xFFFAFCFF)
-                val bottom=if(wet)Color(0xFF7C8F9F)else Color(0xFFC4D2DE)
-                scale(.76f,.70f,pivot=Offset(x,y)) {
-                    drawPath(cloud,Brush.verticalGradient(listOf(top,bottom),y-unit*.27f,y+unit*.18f))
-                    drawPath(cloud,Color.White.copy(alpha=.30f),style=Stroke(.6.dp.toPx()))
+                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFF4CF),Color(0xFFFFC566)),c-Offset(r*.3f,r*.3f),r*1.3f),r,c)
+            }
+            if(night) {
+                val c=if(withCloud) Offset(x+u*.12f,y-u*.14f) else Offset(x,y)
+                val r=u*.15f
+                drawCircle(Brush.radialGradient(listOf(Color(0xFFD6E5EF).copy(alpha=.35f),Color.Transparent),c,r*2.2f),r*2.2f,c)
+                val moon=Path().apply{addOval(Rect(c,r))}
+                val cut=Path().apply{addOval(Rect(Offset(c.x+r*.55f,c.y-r*.35f),r*.9f))}
+                drawPath(Path.combine(PathOperation.Difference,moon,cut),Brush.linearGradient(listOf(Color(0xFFF4F8FC),Color(0xFFC5D6E4)),c-Offset(r,r),c+Offset(r,r)))
+                listOf(Offset(-.34f,-.26f),Offset(-.12f,-.36f),Offset(.36f,-.32f),Offset(.30f,.02f),Offset(-.40f,.04f)).forEachIndexed{i,o->
+                    val twinkle=.35f+.65f*((sin((cycle+i*.23f)*2f*PI.toFloat())+1f)/2f)
+                    star(Offset(x+o.x*u,y+o.y*u),(if(i%2==0)3.6f else 2.6f).dp.toPx()*(.7f+.3f*twinkle),Color.White.copy(alpha=twinkle))
                 }
             }
-            if(wet)repeat(7){i->val px=x-unit*.2f+i*unit*.065f;val py=y+unit*.18f+((rain+i*.17f)%1f)*unit*.29f;drawLine(Color(0xFF84BACC).copy(alpha=.6f),Offset(px,py),Offset(px-2.dp.toPx(),py+5.dp.toPx()),1.dp.toPx(),StrokeCap.Round)}
-            if(snow)repeat(7){i->val py=y+unit*.18f+((rain+i*.17f)%1f)*unit*.29f;drawCircle(Color.White,2.dp.toPx(),Offset(x-unit*.2f+i*unit*.065f,py))}
-            if(windy || fog)repeat(3){i->val shift=if(windy)(rain*unit*.3f)else drift.dp.toPx();val yy=y+unit*(.12f+i*.1f);drawLine(Color(0xFFA4B9BD).copy(alpha=.65f),Offset(x-unit*.28f+shift,yy),Offset(x+unit*.27f+shift,yy),2.dp.toPx(),StrokeCap.Round)}
-            if(code in 95..99){val flash=Path().apply{moveTo(x+unit*.08f,y+unit*.15f);lineTo(x-unit*.04f,y+unit*.35f);lineTo(x+unit*.07f,y+unit*.31f);lineTo(x-unit*.02f,y+unit*.49f)};drawPath(flash,Color(0xFFFFD980).copy(alpha=if(rain>.8f).95f else .25f),style=Stroke(2.dp.toPx()))}
-
+            if(withCloud) {
+                val (top,bottom)=when {
+                    thunder->Color(0xFF9AA6B6) to Color(0xFF56657A)
+                    wet->Color(0xFFC6D0DB) to Color(0xFF7D90A3)
+                    night->Color(0xFFD0DAE5) to Color(0xFF8E9FB2)
+                    snow->Color(0xFFF7F9FC) to Color(0xFFC2CFDC)
+                    else->Color.White to Color(0xFFD3DEE9)
+                }
+                if(wet || snow || fog || code==3) cloud(Offset(x+u*.17f-sway*.6f,y-u*.11f),u*.52f,lerp(top,bottom,.35f),bottom,.92f)
+                val flash=if(thunder) thunderFlash(cycle) else 0f
+                cloud(Offset(x+sway,y),u*.78f,lerp(top,Color.White,flash*.5f),bottom,1f)
+            }
+            if(wet) {
+                val count=if(thunder) 6 else 8
+                repeat(count){i->
+                    val p=(rain*(if(i%2==0)1f else .85f)+i*.37f)%1f
+                    val px=x-u*.25f+i*u*(.5f/count)+sway
+                    val py=y+u*.16f+p*u*.34f
+                    raindrop(Offset(px-p*u*.04f,py),u,sin(p*PI.toFloat()))
+                }
+            }
+            if(snow) repeat(7){i->
+                val p=(cycle*(if(i%2==0)1f else .8f)+i*.29f)%1f
+                val px=x-u*.24f+i*u*.075f+sin((p*2f+i*.4f)*PI.toFloat())*4.dp.toPx()+sway
+                val py=y+u*.16f+p*u*.33f
+                snowflake(Offset(px,py),(if(i%3==0)5.5f else if(i%3==1)4.2f else 3.4f).dp.toPx(),p*180f+i*40f,sin(p*PI.toFloat()).coerceIn(0f,1f))
+            }
+            if(thunder) {
+                val flash=thunderFlash(cycle)
+                val o=Offset(x+u*.02f+sway,y+u*.13f)
+                val bolt=Path().apply {
+                    moveTo(o.x+u*.05f,o.y);lineTo(o.x-u*.07f,o.y+u*.17f);lineTo(o.x-u*.005f,o.y+u*.17f)
+                    lineTo(o.x-u*.06f,o.y+u*.33f);lineTo(o.x+u*.10f,o.y+u*.12f);lineTo(o.x+u*.03f,o.y+u*.12f)
+                    lineTo(o.x+u*.10f,o.y);close()
+                }
+                if(flash>0f) drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE9A6).copy(alpha=.55f*flash),Color.Transparent),Offset(o.x,o.y+u*.15f),u*.32f),u*.32f,Offset(o.x,o.y+u*.15f))
+                drawPath(bolt,Brush.verticalGradient(listOf(Color(0xFFFFF6C2),Color(0xFFFFC23D)),o.y,o.y+u*.33f),alpha=.45f+.55f*flash)
+            }
+            if(fog) repeat(4){i->
+                val off=sin((cycle+i*.25f)*2f*PI.toFloat())*u*.05f*(if(i%2==0)1f else -1f)
+                val w=u*(.62f-i%2*.12f);val h=u*.05f
+                val left=x-w/2f+off+u*(if(i%2==0)-.02f else .04f)
+                val yy=y+u*(.02f+i*.085f)
+                drawRoundRect(Brush.horizontalGradient(listOf(Color.White.copy(alpha=0f),Color.White.copy(alpha=.8f),Color.White.copy(alpha=0f)),left,left+w),Offset(left,yy),Size(w,h),CornerRadius(h/2f))
+            }
+            if(windy) repeat(3){i->
+                val p=(cycle+i*.33f)%1f
+                val length=u*listOf(.44f,.34f,.40f)[i]
+                val start=Offset(x-u*.40f+p*u*.18f,y+u*(-.04f+i*.12f))
+                gust(start,length,u*.045f,(if(night) Color(0xFFDDE7F0) else Color.White).copy(alpha=.9f*sin(p*PI.toFloat())),2.2.dp.toPx())
+            }
         }
         Column(Modifier.align(Alignment.CenterEnd).widthIn(min=94.dp).glass(27.dp).padding(horizontal=17.dp,vertical=20.dp),horizontalAlignment=Alignment.CenterHorizontally) {
             AnimatedContent(temp,transitionSpec={(fadeIn(tween(350))+slideInVertically{it/4}) togetherWith fadeOut(tween(200))},label="Weather temperature"){value->Text(value,style=F.text(35))}
@@ -190,6 +245,78 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
             weather?.let{Text(it.city.substringBefore(','),style=F.text(8,muted=true),maxLines=1,modifier=Modifier.padding(top=5.dp))}
         }
     }
+}
+
+/** Two quick strikes early in each cycle, then a calm stretch. */
+private fun thunderFlash(cycle:Float):Float = when {
+    cycle<.05f -> 1f-cycle/.05f
+    cycle>=.09f && cycle<.15f -> 1f-(cycle-.09f)/.06f
+    else -> 0f
+}
+
+private fun DrawScope.cloud(center:Offset,s:Float,top:Color,bottom:Color,alpha:Float) {
+    val shape=Path().apply {
+        addRoundRect(RoundRect(Rect(center.x-s*.42f,center.y-s*.02f,center.x+s*.42f,center.y+s*.20f),CornerRadius(s*.11f)))
+        addOval(Rect(Offset(center.x-s*.21f,center.y+s*.01f),s*.17f))
+        addOval(Rect(Offset(center.x+s*.03f,center.y-s*.08f),s*.24f))
+        addOval(Rect(Offset(center.x+s*.26f,center.y+s*.04f),s*.15f))
+    }
+    translate(0f,s*.035f){drawPath(shape,Color(0xFF29384A).copy(alpha=.10f*alpha))}
+    drawPath(shape,Brush.verticalGradient(listOf(top,bottom),center.y-s*.32f,center.y+s*.22f),alpha=alpha)
+    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha=.55f*alpha),Color.White.copy(alpha=0f)),Offset(center.x-s*.02f,center.y-s*.18f),s*.2f),s*.2f,Offset(center.x-s*.02f,center.y-s*.18f))
+}
+
+private fun DrawScope.raindrop(at:Offset,u:Float,alpha:Float) {
+    val r=u*.017f;val length=u*.06f
+    val drop=Path().apply {
+        moveTo(0f,-length)
+        cubicTo(r*.5f,-length*.45f,r,-r*.4f,r,0f)
+        arcTo(Rect(-r,-r,r,r),0f,180f,false)
+        cubicTo(-r,-r*.4f,-r*.5f,-length*.45f,0f,-length)
+        close()
+    }
+    withTransform({translate(at.x,at.y);rotate(14f,Offset.Zero)}) {
+        drawPath(drop,Brush.verticalGradient(listOf(Color(0xFFCBE9F6),Color(0xFF5FA8D3)),-length,r),alpha=alpha.coerceIn(0f,1f))
+    }
+}
+
+private fun DrawScope.snowflake(at:Offset,radius:Float,angle:Float,alpha:Float) {
+    val stroke=(radius*.26f).coerceAtLeast(1f)
+    rotate(angle,at) {
+        listOf(Color(0xFF7F97AF).copy(alpha=.45f*alpha) to stroke*1.9f,Color.White.copy(alpha=alpha) to stroke).forEach{(color,width)->
+            repeat(6){i->
+                val a=i*PI.toFloat()/3f
+                val tip=Offset(at.x+cos(a)*radius,at.y+sin(a)*radius)
+                drawLine(color,at,tip,width,StrokeCap.Round)
+                val joint=Offset(at.x+cos(a)*radius*.58f,at.y+sin(a)*radius*.58f)
+                listOf(-.65f,.65f).forEach{b->drawLine(color,joint,Offset(joint.x+cos(a+b)*radius*.36f,joint.y+sin(a+b)*radius*.36f),width*.85f,StrokeCap.Round)}
+            }
+        }
+    }
+}
+
+private fun DrawScope.star(at:Offset,radius:Float,color:Color) {
+    val inner=radius*.28f
+    val sparkle=Path().apply {
+        moveTo(at.x,at.y-radius)
+        quadraticTo(at.x+inner*.3f,at.y-inner*.3f,at.x+radius,at.y)
+        quadraticTo(at.x+inner*.3f,at.y+inner*.3f,at.x,at.y+radius)
+        quadraticTo(at.x-inner*.3f,at.y+inner*.3f,at.x-radius,at.y)
+        quadraticTo(at.x-inner*.3f,at.y-inner*.3f,at.x,at.y-radius)
+        close()
+    }
+    drawPath(sparkle,color)
+}
+
+private fun DrawScope.gust(start:Offset,length:Float,curl:Float,color:Color,width:Float) {
+    val end=Offset(start.x+length,start.y)
+    val path=Path().apply {
+        moveTo(start.x,start.y)
+        cubicTo(start.x+length*.35f,start.y-curl*.7f,start.x+length*.65f,start.y+curl*.7f,end.x,end.y)
+        arcTo(Rect(Offset(end.x,end.y-curl),curl),90f,-270f,false)
+    }
+    drawPath(path,Color(0xFF7F97AF).copy(alpha=color.alpha*.4f),style=Stroke(width*2f,cap=StrokeCap.Round,join=StrokeJoin.Round))
+    drawPath(path,color,style=Stroke(width,cap=StrokeCap.Round,join=StrokeJoin.Round))
 }
 
 @Composable internal fun WidgetEditSheet(kind:FluidWidget,page:String,state:FluidState,model:FluidModel,arrange:()->Unit,resize:()->Unit,close:()->Unit) {
