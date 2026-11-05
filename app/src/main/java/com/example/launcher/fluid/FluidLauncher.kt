@@ -210,7 +210,7 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                         when(state.config.pages[index]) {
                             "Home" -> FluidHome(state,model,hero,badges,padding,calendarAccess,activityAccess,{showPanel("Customize:Home")},{openDrawer(true)},{scope.launch { pager.animateScrollToPage(state.config.pages.indexOf("Space").coerceAtLeast(HOME_PAGE),animationSpec=spring(.9f,320f)) }},::launch,pageState)
                             "Space" -> FluidSpace(state,model,hero,padding,calendarAccess,activityAccess,{showPanel("Spaces")},pageState)
-                            "Plan" -> FluidPlan(state,model,padding,calendarAccess,pageState)
+                            "Plan" -> FluidPlan(state,model,hero,padding,calendarAccess,activityAccess,pageState)
                             "Markets" -> FluidMarkets(state,model,padding) { showPanel("Market & news settings") }
                             else -> FluidCustomPage(currentPage,state,model,hero,padding,calendarAccess,activityAccess,pageState)
                         }
@@ -289,10 +289,17 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     val pageEditor=LocalPageEdit.current
     val interaction=remember { MutableInteractionSource() }
     var source by remember { mutableStateOf(Rect.Zero) }
-    val opensDetail=kind!=FluidWidget.TASKS && kind!=FluidWidget.AGENDA && kind!=FluidWidget.SPACE_APPS
-    val surface=if(kind==FluidWidget.MUSIC_OPEN) Modifier else Modifier.glass(30.dp,true)
+    val fixed=widgetFixedHeight(kind)?.let { if(kind==FluidWidget.CLOCK && widgetSize(kind,state.config)=="Large") 240.dp else it }
+    val opensDetail=kind==FluidWidget.WEATHER || fixed==null && kind!=FluidWidget.TASKS && kind!=FluidWidget.AGENDA && kind!=FluidWidget.SPACE_APPS
+    val surface=if(kind==FluidWidget.MUSIC_OPEN || kind==FluidWidget.CLOCK) Modifier else Modifier.glass(30.dp,true)
+    val click={ when {
+        kind==FluidWidget.AGENDA -> model.open(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR))
+        kind==FluidWidget.CLOCK -> model.open(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
+        opensDetail -> hero.open(kind,source)
+    } }
+    val size=if(fixed!=null) Modifier.height(fixed).clip(RoundedCornerShape(30.dp)) else Modifier.animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp)
     Column(modifier.fillMaxWidth().onGloballyPositioned { source=Rect(it.positionInRoot(),it.size.toSize());hero.bounds[kind]=source }.graphicsLayer { alpha=if(hero.kind==kind) 0f else 1f }
-        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick={if(kind==FluidWidget.AGENDA)model.open(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR))else if(opensDetail)hero.open(kind,source)},onLongClick={if(pageEditor==null)edit(kind)}).animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp).testTag("fluid-widget-${kind.name}")) {
+        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick=click,onLongClick={if(pageEditor==null)edit(kind)}).then(size).testTag("fluid-widget-${kind.name}")) {
         WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity,compact=state.config.sizes[kind]=="Compact")
     }
 }
@@ -306,12 +313,7 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     Box(modifier.navigationBarsPadding().onGloballyPositioned{edit?.viewport=it.boundsInRoot()}.testTag("fluid-space")) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom=100.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             FluidHeading("Your space","Apps and widgets, your way.") { if(edit?.active!=true) GlassIcon("edit","Organize spaces",onClick=manage) }
-            widgets.forEachIndexed { index,kind -> key(kind) {
-                Box(Modifier.pageEditCard(kind,edit,phase,index)) {
-                    ExpandableWidget(kind,state,model,hero,calendar,activity)
-                    if(edit!=null && edit.active) Box(Modifier.matchParentSize().pageEditDrag(kind,edit))
-                }
-            } }
+            WidgetGrid(widgets,state.config,edit,16.dp,phase) { kind -> ExpandableWidget(kind,state,model,hero,calendar,activity) }
             ControlWidgetRows(state.config.spaceWidgets.filter{it in tinyControls},state,model)
             val openGallery=LocalSpaceWidgetGallery.current
             if(edit?.active!=true) GlassButton("Add widgets",Modifier.fillMaxWidth(),glyph="plus",onClick=openGallery)
@@ -334,7 +336,7 @@ internal val LocalSpaceApps = compositionLocalOf { SpaceAppsHost(emptySet(),{_,_
             }
         }
         if(apps.isEmpty()) Column(Modifier.fillMaxWidth().padding(horizontal=4.dp)) {
-            Text("Your ${selected.lowercase()} apps",style=F.text(16,true));Text("Choose the apps that belong here.",style=F.text(13,muted=true),modifier=Modifier.padding(top=6.dp));GlassButton("Choose apps",Modifier.padding(top=12.dp),glyph="plus",onClick=host.manage)
+            Text("Choose the apps that belong in ${selected.lowercase()}.",style=F.text(13,muted=true));GlassButton("Choose apps",Modifier.padding(top=12.dp),glyph="plus",onClick=host.manage)
         } else Column(Modifier.fillMaxWidth().testTag("space-apps-$selected")) {
             apps.chunked(4).forEach { group -> Row(Modifier.fillMaxWidth()) { group.forEach { app -> FluidAppTile(app,host.badges,state.config.labels,host.launch,{},Modifier.weight(1f)) };repeat(4-group.size){Spacer(Modifier.weight(1f))} } }
         }
@@ -351,12 +353,7 @@ internal val LocalSpaceApps = compositionLocalOf { SpaceAppsHost(emptySet(),{_,_
         Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom=100.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             FluidHeading(page,"A fresh page to make your own.")
             if(widgets.isEmpty()) Text("Long press empty space to add widgets.",style=F.text(13,muted=true))
-            widgets.forEachIndexed { index,kind -> key(kind) {
-                Box(Modifier.pageEditCard(kind,edit,phase,index)) {
-                    ExpandableWidget(kind,state,model,hero,calendar,activity)
-                    if(edit!=null && edit.active) Box(Modifier.matchParentSize().pageEditDrag(kind,edit))
-                }
-            } }
+            WidgetGrid(widgets,state.config,edit,14.dp,phase) { kind -> ExpandableWidget(kind,state,model,hero,calendar,activity) }
         }
     }
 }

@@ -19,7 +19,7 @@ class WidgetSizeOptionsTest {
         compose.setContent { FluidTheme(FluidConfig()) {
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,1.8f)) {
-                Box(Modifier.width(240.dp)){WidgetSizeOptions("Standard") {}}
+                Box(Modifier.width(240.dp)){WidgetSizeOptions(FluidWidget.AGENDA,"Standard") {}}
             }
         } }
         val bounds=listOf("Compact","Standard","Large").map { label ->

@@ -83,7 +83,16 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
         FluidWidget.BRIGHTNESS -> BrightnessWidget(model)
         FluidWidget.VOLUME -> VolumeWidget()
         FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidget.MOBILE_DATA,FluidWidget.SOUND,FluidWidget.FLASHLIGHT,FluidWidget.AIRPLANE -> TinyControl(kind,state,model)
-        FluidWidget.CLOCK -> AnalogClock(state.now, Modifier.fillMaxWidth().height(if(detail) 270.dp else if(compact) 110.dp else 160.dp)) { model.open(android.content.Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)) }
+        FluidWidget.CLOCK -> AnalogClock(state.now, if(detail) Modifier.fillMaxWidth().height(270.dp) else Modifier.fillMaxSize())
+        FluidWidget.SUN_PATH -> SunPathWidget(state,LocalWeatherLocate.current)
+        FluidWidget.WIND -> WindWidget(state.weather,LocalWeatherLocate.current)
+        FluidWidget.FOCUS -> FocusWidget(state,model)
+        FluidWidget.BREATHE -> BreatheWidget()
+        FluidWidget.WORLD_CLOCKS -> WorldClocksWidget(state,model)
+        FluidWidget.NOW_PLAYING -> NowPlayingWidget(state,model)
+        FluidWidget.BATTERY -> BatteryWidget(model)
+        FluidWidget.HYDRATION -> HydrationWidget(state,model)
+        FluidWidget.ACTIVITY_RINGS -> ActivityRingsWidget(state,activityAccess)
         FluidWidget.NOTIFICATIONS -> NotificationStack(state,model,detail=detail)
 
         FluidWidget.AGENDA -> {
@@ -112,15 +121,9 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
         FluidWidget.QUICK_ACTIONS -> QuickActions(state,model)
         FluidWidget.FAVORITES -> FavoritesWidget(state,model)
         FluidWidget.WEATHER -> {
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(state.weather?.city ?: "Weather",style=F.text(12,muted=true))
-                    Text(state.weather?.let { "${it.temperature.roundToInt()}°" } ?: "—°",style=F.text(42))
-                    Text(state.weather?.condition ?: if(state.weatherLoading) "Looking outside…" else "Choose your city",style=F.text(12,muted=true))
-                }
-                Glyph("weather",F.purple,Modifier.size(46.dp))
-            }
-            if(detail) {
+            if(!detail) WeatherCard(state,widgetSize(kind,state.config)=="Large")
+            else {
+                Box(Modifier.fillMaxWidth().height(170.dp)) { WeatherCard(state,large=true) }
                 val locate=LocalWeatherLocate.current
                 GlassButton("Use current location",Modifier.padding(top=16.dp),glyph="maps",onClick=locate)
                 Text(if(state.config.autoWeather) "Automatic location" else "Manual city",style=F.text(11,muted=true),modifier=Modifier.padding(top=8.dp))
@@ -144,7 +147,6 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
             }
         }
         FluidWidget.TASKS -> {
-            Text("Today at Work",style=F.text(16,true)); Spacer(Modifier.height(12.dp))
             if(state.tasks.isEmpty()) Text("A clear mind starts here.\nAdd your first task.",style=F.text(13,muted=true))
             state.tasks.take(if(detail) 100 else if(compact) 1 else 3).forEach { task ->
                 Row(Modifier.fillMaxWidth().clickable { model.toggleTask(task) }.padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically) {

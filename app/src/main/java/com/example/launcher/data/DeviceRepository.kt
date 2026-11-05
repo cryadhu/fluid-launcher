@@ -42,6 +42,7 @@ enum class SoundMode(val label: String) { NORMAL("Normal"), VIBRATE("Vibrate"), 
     fun next() = when (this) { NORMAL -> SILENT; SILENT -> VIBRATE; VIBRATE -> NORMAL }
 }
 data class DeviceState(val wifi: Boolean = false, val bluetooth: Boolean? = null, val torch: Boolean = false, val hasTorch: Boolean = false, val silent: Boolean = false, val calendarGranted: Boolean = false, val events: List<AgendaEvent> = emptyList(), val calendarError: Boolean = false, val mediaAccess: Boolean = false, val mediaTitle: String? = null, val mediaArtwork: android.graphics.Bitmap? = null, val playing: Boolean = false, val defaultHome: Boolean = false,
+    val mediaArtist: String? = null, val mediaPosition: Long = 0, val mediaPositionAt: Long = 0, val mediaDuration: Long = 0, val mediaSpeed: Float = 1f,
     val wifiConnected: Boolean = false, val wifiName: String? = null, val bluetoothAvailable: Boolean = true, val bluetoothGranted: Boolean = false, val pairedDevices: List<PairedDevice> = emptyList(),
     val wifiNetworks: List<WifiNetwork> = emptyList(), val wifiScanGranted: Boolean = false, val locationEnabled: Boolean = false,
     val soundMode: SoundMode = SoundMode.NORMAL, val mobileData: Boolean? = null, val mobileAvailable: Boolean = false,
@@ -146,6 +147,9 @@ class DeviceRepository(private val context: Context) {
             mediaArtwork = active?.metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
                 ?: active?.metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART),
             playing = active?.playbackState?.state == PlaybackState.STATE_PLAYING,
+            mediaArtist = active?.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST),
+            mediaPosition = active?.playbackState?.position?.coerceAtLeast(0) ?: 0, mediaPositionAt = active?.playbackState?.lastPositionUpdateTime ?: 0,
+            mediaDuration = active?.metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)?.coerceAtLeast(0) ?: 0, mediaSpeed = active?.playbackState?.playbackSpeed?.takeIf { it > 0f } ?: 1f,
             defaultHome = HomeSetup.isDefaultHome(context), wifiConnected = wifiConnected, wifiName = wifiName,
             bluetoothAvailable = bluetooth != null, bluetoothGranted = bluetoothGranted, pairedDevices = paired,
             wifiNetworks = networks, wifiScanGranted = scanGranted, locationEnabled = locationEnabled,

@@ -113,8 +113,8 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                         FluidWidget.entries.forEach { widget ->
                             Column(Modifier.fillMaxWidth().glass(28.dp).padding(18.dp)) {
                                 val enabled=widget in if(name=="Space widgets")state.config.spaceWidgets else state.config.widgets
-                                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(widget.title,style=F.text(17,true));Text(widget.subtitle,style=F.text(11,muted=true))};GlassButton(if(enabled)"Remove"else"Add",primary=!enabled){if(name=="Space widgets")model.toggleSpaceWidget(widget)else model.toggleWidget(widget)}}
-                                Spacer(Modifier.height(18.dp));WidgetBody(widget,state,model,calendarAccess=calendar,activityAccess=activity)
+                                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Row(verticalAlignment=Alignment.CenterVertically){Text(widget.title,style=F.text(17,true));WidgetSizeChip(widget,state.config)};Text(widget.subtitle,style=F.text(11,muted=true))};GlassButton(if(enabled)"Remove"else"Add",primary=!enabled){if(name=="Space widgets")model.toggleSpaceWidget(widget)else model.toggleWidget(widget)}}
+                                Spacer(Modifier.height(18.dp));WidgetPreview(widget,state,model,calendar,activity)
                             }
                         }
                     }
@@ -182,8 +182,8 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                             FluidWidget.entries.forEach { widget ->
                                 val enabled=widget in model.widgetsForPage(page)
                                 Column(Modifier.fillMaxWidth().glass(28.dp).padding(18.dp)) {
-                                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(widget.title,style=F.text(17,true));Text(widget.subtitle,style=F.text(11,muted=true))};GlassButton(if(enabled)"Remove"else"Add",primary=!enabled){model.toggleWidgetForPage(page,widget)}}
-                                    Spacer(Modifier.height(18.dp));WidgetBody(widget,state,model,calendarAccess=calendar,activityAccess=activity)
+                                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Row(verticalAlignment=Alignment.CenterVertically){Text(widget.title,style=F.text(17,true));WidgetSizeChip(widget,state.config)};Text(widget.subtitle,style=F.text(11,muted=true))};GlassButton(if(enabled)"Remove"else"Add",primary=!enabled){model.toggleWidgetForPage(page,widget)}}
+                                    Spacer(Modifier.height(18.dp));WidgetPreview(widget,state,model,calendar,activity)
                                 }
                             }
                         } else {
@@ -201,7 +201,7 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
                         val currentWidgets=model.widgetsForPage(customizePage)
                         if(currentWidgets.isEmpty())Text("A little breathing room. Add a widget whenever you're ready.",style=F.text(13,muted=true))
                         currentWidgets.forEach { kind ->
-                            Row(Modifier.fillMaxWidth().glass(24.dp).padding(12.dp),verticalAlignment=Alignment.CenterVertically){Glyph(kind.glyph,F.purple,Modifier.size(23.dp));Column(Modifier.weight(1f).padding(start=14.dp)){Text(kind.title,style=F.text(14,true));Text(kind.subtitle,style=F.text(10,muted=true))};GlassIcon("close","Remove ${kind.title}",Modifier.size(32.dp)){model.toggleWidgetForPage(customizePage,kind)}}
+                            Row(Modifier.fillMaxWidth().glass(24.dp).padding(12.dp),verticalAlignment=Alignment.CenterVertically){Glyph(kind.glyph,F.purple,Modifier.size(23.dp));Column(Modifier.weight(1f).padding(start=14.dp)){Row(verticalAlignment=Alignment.CenterVertically){Text(kind.title,style=F.text(14,true));WidgetSizeChip(kind,state.config)};Text(kind.subtitle,style=F.text(10,muted=true))};GlassIcon("close","Remove ${kind.title}",Modifier.size(32.dp)){model.toggleWidgetForPage(customizePage,kind)}}
                         }
                         GlassButton("Explore widgets",Modifier.fillMaxWidth(),primary=true,glyph="plus"){navigate("Widgets:$customizePage")}
                         }
@@ -215,3 +215,15 @@ internal fun fluidFilteredApps(apps:List<InstalledApp>,config:FluidConfig,query:
     Column(Modifier.fillMaxWidth().glass(28.dp).padding(20.dp)){Text(title,style=F.text(10,true,muted=true),modifier=Modifier.padding(bottom=14.dp));content()}
 }
 @Composable private fun SettingSwitch(title:String,subtitle:String,value:Boolean,change:(Boolean)->Unit){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,style=F.text(14,true));Text(subtitle,style=F.text(11,muted=true),modifier=Modifier.padding(top=4.dp))};Switch(value,change,colors=SwitchDefaults.colors(checkedThumbColor=Color.White,checkedTrackColor=F.purple,uncheckedTrackColor=F.muted.copy(alpha=.2f),uncheckedBorderColor=Color.Transparent))}}
+
+@Composable internal fun WidgetSizeChip(widget:FluidWidget,config:FluidConfig) {
+    Text(widgetGrid(widget,widgetSize(widget,config)),style=F.text(10,true),color=F.purple,modifier=Modifier.padding(start=8.dp).clip(CircleShape).background(F.purple.copy(alpha=.12f)).padding(horizontal=8.dp,vertical=3.dp).testTag("widget-size-${widget.name}"))
+}
+
+@Composable private fun WidgetPreview(widget:FluidWidget,state:FluidState,model:FluidModel,calendar:()->Unit,activity:()->Unit) {
+    val fixed=widgetFixedHeight(widget)
+    if(fixed==null) WidgetBody(widget,state,model,calendarAccess=calendar,activityAccess=activity)
+    else Box(Modifier.fillMaxWidth(if(isHalf(widget,state.config)).5f else 1f).height(fixed).clip(RoundedCornerShape(24.dp)).background(F.purple.copy(alpha=.05f))) {
+        Column { WidgetBody(widget,state,model,calendarAccess=calendar,activityAccess=activity) }
+    }
+}

@@ -6,7 +6,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 
 data class WeatherHour(val time: String, val temperature: Double)
-data class HomeWeather(val city: String, val temperature: Double, val condition: String, val hours: List<WeatherHour>, val code: Int = -1, val isDay: Boolean = true, val windSpeed: Double = 0.0)
+data class HomeWeather(val city: String, val temperature: Double, val condition: String, val hours: List<WeatherHour>, val code: Int = -1, val isDay: Boolean = true, val windSpeed: Double = 0.0, val windDirection: Int = 0, val uv: Double = 0.0, val sunrise: String? = null, val sunset: String? = null, val utcOffset: Int? = null)
 data class MarketQuote(val name: String, val price: Double, val change: Double, val points: List<Double>, val timestamp: Long)
 internal fun weatherCondition(code: Int): String = when (code) { 0 -> "Clear sky"; 1,2,3 -> "Cloudy"; 45,48 -> "Fog"; in 51..67 -> "Rain"; in 71..77 -> "Snow"; in 80..82 -> "Showers"; in 85..86 -> "Snow showers"; in 95..99 -> "Thunderstorms"; else -> "Weather" }
 class WidgetDataRepository {
@@ -16,7 +16,7 @@ class WidgetDataRepository {
         weather(place.getDouble("latitude"), place.getDouble("longitude"), "${place.getString("name")}, ${place.optString("country_code")}")
     }
     suspend fun weather(latitude: Double, longitude: Double, label: String): HomeWeather = withContext(Dispatchers.IO) {
-        val data = JSONObject(getHttps("https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,weather_code,is_day,wind_speed_10m&hourly=temperature_2m&forecast_days=2&wind_speed_unit=kmh&timezone=auto"))
+        val data = JSONObject(getHttps("https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m,uv_index&hourly=temperature_2m&daily=sunrise,sunset&forecast_days=2&wind_speed_unit=kmh&timezone=auto"))
         parseCurrentWeather(data,label)
     }
     suspend fun markets(): List<MarketQuote> = withContext(Dispatchers.IO) {
@@ -42,5 +42,7 @@ internal fun parseCurrentWeather(data: JSONObject,label: String): HomeWeather {
         code in 1..3 -> if(wind>=20) "Windy" else if(day) "Cloudy" else "Cloudy night"
         else -> weatherCondition(code)
     }
-    return HomeWeather(label,current.getDouble("temperature_2m"),condition,hours,code,day,wind)
+    val daily=data.optJSONObject("daily")
+    fun dailyTime(key:String)=daily?.optJSONArray(key)?.optString(0)?.takeIf{it.contains('T')}?.substringAfter('T')
+    return HomeWeather(label,current.getDouble("temperature_2m"),condition,hours,code,day,wind,current.optDouble("wind_direction_10m",0.0).toInt(),current.optDouble("uv_index",0.0),dailyTime("sunrise"),dailyTime("sunset"),if(data.has("utc_offset_seconds")) data.optInt("utc_offset_seconds") else null)
 }

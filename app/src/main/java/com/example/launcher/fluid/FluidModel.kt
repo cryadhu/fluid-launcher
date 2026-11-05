@@ -20,7 +20,28 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
     AGENDA("Agenda", "Your day, at a glance", "calendar"), QUICK_ACTIONS("Quick actions", "Useful tools at a touch", "app"), FAVORITES("Favorites", "Your starred contacts", "contacts"), MUSIC("Music", "Orb with glass background", "music"), MUSIC_OPEN("Music (open)", "Orb without background", "music"),
     WEATHER("Weather", "A window outside", "weather"), TASKS("Tasks", "Make room for focus", "tasks"),
     ACTIVITY("Activity", "Steps while the launcher is active", "health"), STORAGE("Storage", "Space for what matters", "files"), DATE("Date", "A moment in time", "calendar"),
-    SPACE_APPS("Space apps", "Work, personal and tools", "app")
+    SPACE_APPS("Space apps", "Work, personal and tools", "app"),
+    SUN_PATH("Sun path", "Sunrise to sunset", "weather"), WIND("Wind", "Speed and direction", "weather"),
+    FOCUS("Focus", "A 25 minute focus ring", "clock"), BREATHE("Breathe", "A calm breathing guide", "health"), WORLD_CLOCKS("World clocks", "Time around the world", "clock"),
+    NOW_PLAYING("Now playing", "Your music, spinning", "music"), BATTERY("Battery", "Charge at a glance", "health"), HYDRATION("Water", "Glasses through the day", "health"), ACTIVITY_RINGS("Activity rings", "Move, exercise and stand", "health")
+}
+internal val halfWidgets=setOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.FOCUS,FluidWidget.BATTERY,FluidWidget.HYDRATION)
+private val fixedWidgets=mapOf(FluidWidget.SUN_PATH to "4×2",FluidWidget.WIND to "4×1",FluidWidget.BREATHE to "4×2",FluidWidget.WORLD_CLOCKS to "4×1",FluidWidget.NOW_PLAYING to "4×2",FluidWidget.ACTIVITY_RINGS to "4×2")
+private val controlKinds=setOf(FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidget.MOBILE_DATA,FluidWidget.SOUND,FluidWidget.FLASHLIGHT,FluidWidget.AIRPLANE)
+/** Size names a widget can take; an empty list means the widget has one fixed size. */
+internal fun sizeOptions(kind:FluidWidget):List<String> = when(kind) {
+    in controlKinds, in fixedWidgets -> emptyList()
+    in halfWidgets -> listOf("Standard","Large")
+    else -> listOf("Compact","Standard","Large")
+}
+internal fun widgetSize(kind:FluidWidget,config:FluidConfig):String = config.sizes[kind]?.takeIf{it in sizeOptions(kind)} ?: "Standard"
+/** Half widgets share a row with the next half widget, like a 2×2 tile on a 4-column grid. */
+internal fun isHalf(kind:FluidWidget,config:FluidConfig) = kind in halfWidgets && widgetSize(kind,config)=="Standard"
+internal fun widgetGrid(kind:FluidWidget,size:String="Standard"):String = fixedWidgets[kind] ?: when {
+    kind in controlKinds -> "1×1"
+    kind in halfWidgets -> if(size=="Large") "4×2" else "2×2"
+    kind==FluidWidget.BRIGHTNESS || kind==FluidWidget.VOLUME -> if(size=="Large") "4×2" else "4×1"
+    else -> when(size) { "Compact"->"4×1"; "Large"->if(kind==FluidWidget.NOTIFICATIONS) "4×4" else "4×3"; else->"4×2" }
 }
 data class FluidTask(val id: Long, val text: String, val done: Boolean = false)
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Auto", val labels: Boolean = true,
@@ -50,7 +71,9 @@ data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<In
     val device: DeviceState = DeviceState(), val now: Long = System.currentTimeMillis(), val homeEpoch: Int = 0, val wallpaperApplying:Boolean=false,
     val tasks: List<FluidTask> = emptyList(), val weather: HomeWeather? = null, val weatherLoading: Boolean = false,
     val weatherError: String? = null, val storageUsed: Long = 0, val storageTotal: Long = 1, val message: String? = null,
-    val steps: Int? = null)
+    val steps: Int? = null, val standHours: Int = 0, val water: Int = 0, val focusEnd: Long? = null, val focusLeft: Long = FOCUS_LENGTH)
+internal const val FOCUS_LENGTH = 25 * 60_000L
+internal const val WATER_GOAL = 8
 
 class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.SensorEventListener {
     private val prefs = app.getSharedPreferences("fluid_launcher_v1", 0)
@@ -67,10 +90,13 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     private var toastJob: Job? = null
     init {
         val tasks = runCatching { JSONArray(prefs.getString("tasks", "[]")).let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { FluidTask(it.getLong("id"), it.getString("text"), it.getBoolean("done")) } } } }.getOrDefault(emptyList())
-        mutable.update { it.copy(tasks = tasks) }
+        val today = LocalDate.now().toString()
+        mutable.update { it.copy(tasks = tasks, water = if (prefs.getString("waterDay", "") == today) prefs.getInt("water", 0) else 0,
+            standHours = if (prefs.getString("standDay", "") == today) prefs.getStringSet("standHours", emptySet()).orEmpty().size else 0,
+            focusEnd = prefs.getLong("focusEnd", 0L).takeIf { it > 0L }, focusLeft = prefs.getLong("focusLeft", FOCUS_LENGTH)) }
         device.onChange = ::refreshDevice
         refreshApps(); refreshDevice(); refreshWeather()
-        viewModelScope.launch { while (isActive) { delay(1000); mutable.update { it.copy(now = System.currentTimeMillis()) } } }
+        viewModelScope.launch { while (isActive) { delay(1000); mutable.update { it.copy(now = System.currentTimeMillis()) }; finishFocusIfDue() } }
     }
     fun returnHome() { mutable.update { it.copy(homeEpoch = it.homeEpoch + 1) } }
     fun tick() { mutable.update { it.copy(now = System.currentTimeMillis()) }; refreshDevice(); startSteps(); if(System.currentTimeMillis()-lastWeatherAttempt>15*60_000L)refreshWeather() }
@@ -137,7 +163,7 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         }
     }
     fun resizeWidget(widget: FluidWidget, size: String) {
-        if(size in listOf("Compact","Standard","Large")) configure { it.copy(sizes = it.sizes + (widget to size)) }
+        if(size in sizeOptions(widget)) configure { it.copy(sizes = it.sizes + (widget to size)) }
     }
     fun toggleSpaceWidget(widget:FluidWidget)=configure { it.copy(spaceWidgets=if(widget in it.spaceWidgets)it.spaceWidgets-widget else it.spaceWidgets+widget) }
     fun removeSpaceWidget(widget:FluidWidget)=configure { it.copy(spaceWidgets=it.spaceWidgets-widget) }
@@ -264,6 +290,31 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
             }catch(e:Exception){if(e is CancellationException)throw e;mutable.update{it.copy(weatherLoading=false,weatherError=e.message ?: "Weather unavailable. Try again.")}}
         }
     }
+    fun toggleFocus() {
+        val now = System.currentTimeMillis()
+        val s = mutable.value
+        if (s.focusEnd != null) saveFocus(null, (s.focusEnd - now).coerceIn(0L, FOCUS_LENGTH))
+        else saveFocus(now + s.focusLeft.takeIf { it > 0L }.let { it ?: FOCUS_LENGTH }, s.focusLeft)
+    }
+    fun resetFocus() = saveFocus(null, FOCUS_LENGTH)
+    private fun finishFocusIfDue() {
+        val end = mutable.value.focusEnd ?: return
+        if (System.currentTimeMillis() < end) return
+        saveFocus(null, FOCUS_LENGTH)
+        message("Focus session complete. Take a short break.")
+    }
+    private fun saveFocus(end: Long?, left: Long) {
+        mutable.update { it.copy(focusEnd = end, focusLeft = left) }
+        prefs.edit().putLong("focusEnd", end ?: 0L).putLong("focusLeft", left).apply()
+    }
+    fun addWater(delta: Int) {
+        val today = LocalDate.now().toString()
+        val current = if (prefs.getString("waterDay", "") == today) mutable.value.water else 0
+        val next = (current + delta).coerceIn(0, 20)
+        mutable.update { it.copy(water = next) }
+        prefs.edit().putString("waterDay", today).putInt("water", next).apply()
+        if (delta > 0 && next == WATER_GOAL) message("Daily water goal reached")
+    }
     fun startSteps() {
         if (android.os.Build.VERSION.SDK_INT >= 29 && androidx.core.content.ContextCompat.checkSelfPermission(getApplication(), android.Manifest.permission.ACTIVITY_RECOGNITION) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         sensors.getDefaultSensor(android.hardware.Sensor.TYPE_STEP_COUNTER)?.let { sensors.registerListener(this, it, android.hardware.SensorManager.SENSOR_DELAY_NORMAL) }
@@ -274,7 +325,13 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
         val day = LocalDate.now().toString()
         var baseline = prefs.getInt("stepBaseline", total)
         if (prefs.getString("stepDay", "") != day || total < baseline) { baseline = total; prefs.edit().putString("stepDay", day).putInt("stepBaseline", baseline).apply() }
-        mutable.update { it.copy(steps = (total - baseline).coerceAtLeast(0)) }
+        val steps = (total - baseline).coerceAtLeast(0)
+        val previous = mutable.value.steps
+        // An hour counts as a stand hour once steps are recorded during it.
+        val hours = if (prefs.getString("standDay", "") == day) prefs.getStringSet("standHours", emptySet()).orEmpty() else emptySet()
+        val stood = if (previous != null && steps > previous) hours + java.time.LocalTime.now().hour.toString() else hours
+        if (stood != hours || prefs.getString("standDay", "") != day) prefs.edit().putString("standDay", day).putStringSet("standHours", stood).apply()
+        mutable.update { it.copy(steps = steps, standHours = stood.size) }
     }
     override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) = Unit
     override fun onCleared() { device.close(); pauseSensors() }

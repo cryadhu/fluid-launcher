@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
@@ -99,7 +100,8 @@ internal class PageEdit(
     var viewport by mutableStateOf(Rect.Zero)
     val heights = mutableStateMapOf<FluidWidget, Float>()
     val cards = mutableStateMapOf<FluidWidget, Rect>()
-    val flips = mutableStateMapOf<FluidWidget, Animatable<Float, AnimationVector1D>>()
+    val flips = mutableStateMapOf<FluidWidget, Animatable<Offset, AnimationVector2D>>()
+    var gridWidth = 0f
 
     private val flipJobs = mutableMapOf<FluidWidget, Job>()
     private var settleJob: Job? = null
@@ -163,7 +165,7 @@ internal class PageEdit(
         cancelEdge()
         settleJob?.cancel(); settleJob = null; settling = null; settle = null
         val old = visible - kind
-        val before = old.firstOrNull { w -> (cards[w]?.center?.y ?: Float.MAX_VALUE) > at.y }
+        val before = old.firstOrNull { w -> cards[w]?.let { it.top > at.y || it.bottom > at.y && it.center.x > at.x } ?: true }
         val new = old.toMutableList().apply { add(before?.let { indexOf(it) } ?: size, kind) }
         forget(kind)
         heights[kind] = height
@@ -281,50 +283,72 @@ internal class PageEdit(
         }
     }
 
-    private fun tops(list: List<FluidWidget>): Map<FluidWidget, Float> {
+    private fun half(kind: FluidWidget) = isHalf(kind, model.state.value.config)
+
+    /** Mirrors WidgetGrid: consecutive half widgets pair up, everything else takes a full row. */
+    private fun slots(list: List<FluidWidget>): Map<FluidWidget, Offset> {
         var y = 0f
-        return buildMap { list.forEach { w -> put(w, y); y += (heights[w] ?: 0f) + spacingPx } }
+        var open: FluidWidget? = null
+        val right = (gridWidth + spacingPx) / 2f
+        val result = mutableMapOf<FluidWidget, Offset>()
+        fun closeRow(rowHeight: Float) { y += rowHeight + spacingPx; open = null }
+        list.forEach { w ->
+            val pending = open
+            if (half(w) && pending != null) {
+                result[w] = Offset(right, y)
+                closeRow(maxOf(heights[pending] ?: 0f, heights[w] ?: 0f))
+            } else {
+                if (pending != null) closeRow(heights[pending] ?: 0f)
+                result[w] = Offset(0f, y)
+                if (half(w)) open = w else closeRow(heights[w] ?: 0f)
+            }
+        }
+        return result
     }
+
+    private fun slotSize(kind: FluidWidget) =
+        Size(if (half(kind)) (gridWidth - spacingPx) / 2f else gridWidth, heights[kind] ?: 0f)
 
     private fun maybeSwap(kind: FluidWidget) {
         repeat(visible.size.coerceAtLeast(1)) {
             val list = visible
             val from = list.indexOf(kind)
             if (from < 0) return
-            val current = tops(list)
-            val center = (current[kind] ?: 0f) + (heights[kind] ?: 0f) / 2f + drag.y
-            val next = list.getOrNull(from + 1)
-            val prev = list.getOrNull(from - 1)
-            val nextCenter = next?.let { (current[it] ?: 0f) + (heights[it] ?: 0f) / 2f }
-            val prevCenter = prev?.let { (current[it] ?: 0f) + (heights[it] ?: 0f) / 2f }
-            val pair = when {
-                next != null && nextCenter != null && center > nextCenter -> from to from + 1
-                prev != null && prevCenter != null && center < prevCenter -> from to from - 1
-                else -> return
-            }
-            val newList = list.toMutableList().apply {
-                val moved = this[pair.first]; this[pair.first] = this[pair.second]; this[pair.second] = moved
-            }
-            val newTops = tops(newList)
+            val current = slots(list)
+            val size = slotSize(kind)
+            val home = current[kind] ?: return
+            val center = home + Offset(size.width / 2f, size.height / 2f) + drag
+            val target = list.firstOrNull { w ->
+                if (w == kind) return@firstOrNull false
+                val at = current[w] ?: return@firstOrNull false
+                Rect(at, slotSize(w)).contains(center)
+            } ?: return
+            val newList = list.toMutableList().apply { remove(kind); add(list.indexOf(target), kind) }
+            val newSlots = slots(newList)
+            val moved = newSlots[kind] ?: return
+            val oldCenter = home + Offset(size.width / 2f, size.height / 2f)
+            val newCenter = moved + Offset(size.width / 2f, size.height / 2f)
+            // Hysteresis: only move when the new slot is actually nearer the finger.
+            if ((newCenter - center).getDistance() >= (oldCenter - center).getDistance()) return
             shift(list, newList, kind)
-            drag += Offset(0f, (current[kind] ?: 0f) - (newTops[kind] ?: 0f))
+            drag += home - moved
             visible = newList
             model.reorderVisibleWidgetsForPage(page, list, newList)
         }
     }
 
     private fun shift(old: List<FluidWidget>, new: List<FluidWidget>, exclude: FluidWidget?) {
-        val oldTops = tops(old)
-        val newTops = tops(new)
+        val oldSlots = slots(old)
+        val newSlots = slots(new)
         new.forEach { w ->
             if (w == exclude) return@forEach
-            val delta = (oldTops[w] ?: 0f) - (newTops[w] ?: 0f)
-            if (delta == 0f) return@forEach
-            val previous = flips[w]?.value ?: 0f
-            val anim = Animatable(previous + delta)
+            val delta = (oldSlots[w] ?: Offset.Zero) - (newSlots[w] ?: Offset.Zero)
+            if (delta == Offset.Zero) return@forEach
+            val previous = flips[w]?.value ?: Offset.Zero
+            val anim = Animatable(previous + delta, Offset.VectorConverter)
             flips[w] = anim
             flipJobs.remove(w)?.cancel()
-            flipJobs[w] = scope.launch { anim.animateTo(0f, spring(dampingRatio = .86f, stiffness = 900f)) }
+            flipJobs[w] = scope.launch { anim.animateTo(Offset.Zero, spring(dampingRatio = .86f, stiffness = 900f)) }
         }
         flips.keys.toList().filterNot { it in new }.forEach { w ->
             flipJobs.remove(w)?.cancel()
@@ -463,8 +487,8 @@ internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: St
         .zIndex(if (edit.settling == kind) 2f else 0f)
         .graphicsLayer {
             val live = if (edit.dragging != kind && settle != null) settle.value else Offset.Zero
-            translationX = live.x
-            translationY = live.y + (flip?.value ?: 0f)
+            translationX = live.x + (flip?.value?.x ?: 0f)
+            translationY = live.y + (flip?.value?.y ?: 0f)
         }
         .drawWithContent {
             val layer = edit.route.layer
