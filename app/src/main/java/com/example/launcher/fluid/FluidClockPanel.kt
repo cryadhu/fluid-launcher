@@ -152,6 +152,7 @@ private fun Context.openSettings(action: String) {
         if (editing != NEW_ALARM) GlassIcon("plus", "Add alarm", primary = true) { editing = NEW_ALARM }
     }
     if (data.alarms.any { it.enabled }) RingAccessHints()
+    SystemAlarmCard(data, store) { armed(it) }
     if (editing == NEW_ALARM) AlarmEditor(null, ::save, { editing = null }, null)
     if (data.alarms.isEmpty() && editing == null) Text("Add an alarm and it will ring here, even when the screen is locked.", style = F.text(13, muted = true))
     data.alarms.sortedBy { it.hour * 60 + it.minute }.forEach { alarm ->
@@ -161,6 +162,24 @@ private fun Context.openSettings(action: String) {
 }
 
 private const val NEW_ALARM = 0L
+
+@Composable private fun SystemAlarmCard(data: ClockData, store: ClockStore, armed: (Alarm) -> Unit) {
+    val context = LocalContext.current
+    var at by remember { mutableStateOf<Long?>(null) }
+    LifecycleResumeEffect(Unit) { at = store.systemAlarm(); onPauseOrDispose { } }
+    val time = importableAlarm(data.alarms, at) ?: return
+    Row(Modifier.fillMaxWidth().glass(22.dp).padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp).testTag("system-alarm"), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Next alarm in your Clock app", style = F.text(13, true))
+            Text(time.format(DateTimeFormatter.ofPattern("EEE")) + " " + clockTime(context, time.toInstant().toEpochMilli()) + " · the original stays there", style = F.text(11, muted = true))
+        }
+        GlassButton("Import", primary = true) {
+            val alarm = Alarm(NEW_ALARM, time.hour, time.minute)
+            store.update { it.saveAlarm(alarm) }
+            armed(alarm)
+        }
+    }
+}
 
 @Composable private fun AlarmCard(alarm: Alarm, now: Long, toggle: (Boolean) -> Unit, edit: () -> Unit) {
     val context = LocalContext.current

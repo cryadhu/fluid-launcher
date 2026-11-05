@@ -30,6 +30,21 @@ class ClockStore private constructor(private val context: Context) {
     private val prefs = context.getSharedPreferences("fluid_clock_v1", 0)
     private val mutable = MutableStateFlow(decodeClock(prefs.getString("data", null)))
     val state: StateFlow<ClockData> = mutable.asStateFlow()
+
+    init {
+        if (!prefs.getBoolean("starters_v1", false)) {
+            val edit = prefs.edit().putBoolean("starters_v1", true)
+            if (mutable.value.alarms.isEmpty()) {
+                mutable.value = mutable.value.copy(alarms = starterAlarms())
+                edit.putString("data", encodeClock(mutable.value))
+            }
+            edit.apply()
+        }
+    }
+
+    /** Trigger time of the next alarm set in another app; Android does not share its days or label. */
+    fun systemAlarm(): Long? = (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).nextAlarmClock
+        ?.takeIf { it.showIntent?.creatorPackage != context.packageName }?.triggerTime
     private val ringingNow = MutableStateFlow(emptySet<String>())
     val ringing: StateFlow<Set<String>> = ringingNow.asStateFlow()
 

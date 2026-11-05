@@ -506,6 +506,10 @@ A dragged widget now floats above the pages in its own overlay, so it stays unde
 
 Rearranging no longer shows a top bar with a Done button. Hold a widget, drag it, and let go: once the card settles into its slot, or is dropped on the bin, the page leaves edit mode by itself. The bin button is now drawn above the floating card, so it stays visible while you drag onto it. While a widget is being dragged, the dock and the page indicator blur along with the wallpaper. The weather widget always shows the real forecast; the "Cycle animation" preview button is gone. The Work / Personal / Tools app tabs on Your space are now a regular "Space apps" widget that can be reordered, moved to another page or removed; existing setups get it added to the top of the Space page.
 
+### v1.1.38 — Starter alarms and alarm import
+
+The Clock now opens with two alarms ready to use, the way a stock Clock app does: 7:00 AM on weekdays and 9:00 AM on weekends. Both start switched off, so nothing rings until you turn one on. They are added once, and only if you have no alarms yet. If another Clock app has an alarm coming up, the Alarm tab shows it with an Import button that copies the time into Fluid. Android only shares the time of that next alarm, not its repeat days or label, and the original alarm stays in the other app. The card hides once an alarm at that time exists.
+
 ### v1.1.37 — A Clock of its own
 
 Tapping the clock widget now opens a Clock screen inside the launcher instead of the system clock app. It has four tabs, and a glass pill slides between them.

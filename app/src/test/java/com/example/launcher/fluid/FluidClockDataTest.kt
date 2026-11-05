@@ -13,6 +13,17 @@ class FluidClockDataTest {
     private val zone = ZoneId.of("Europe/London")
     private fun at(day: Int, hour: Int, minute: Int) = ZonedDateTime.of(2026, 11, day, hour, minute, 0, 0, zone).toInstant().toEpochMilli()
 
+    @Test fun startersAreOffAndImportSkipsDuplicates() {
+        val starters = starterAlarms()
+        assertTrue(starters.none { it.enabled })
+        assertEquals(setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY), starters[1].days)
+        assertTrue(starters.all { nextRing(it, at(5, 6, 0), zone) == null })
+        assertNull(importableAlarm(starters, null, zone))
+        assertNull(importableAlarm(starters, at(6, 7, 0), zone))
+        assertEquals(6, importableAlarm(starters, at(6, 6, 45), zone)?.hour)
+        assertEquals(3, ClockData(starters).saveAlarm(Alarm(0, 6, 45)).alarms.last().id)
+    }
+
     @Test fun oneTimeAlarmRingsTodayOrTomorrow() {
         val alarm = Alarm(1, 7, 30)
         assertEquals(at(5, 7, 30), nextRing(alarm, at(5, 6, 0), zone))

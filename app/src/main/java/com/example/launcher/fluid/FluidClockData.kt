@@ -15,6 +15,18 @@ internal val defaultWorldZones = listOf("Europe/London", "America/New_York", "As
 data class Alarm(val id: Long, val hour: Int, val minute: Int, val days: Set<DayOfWeek> = emptySet(), val label: String = "",
     val enabled: Boolean = true, val snoozedUntil: Long? = null)
 
+/** Switched-off alarms offered on first open, like a stock Clock app. */
+internal fun starterAlarms() = listOf(
+    Alarm(1, 7, 0, DayOfWeek.entries.take(5).toSet(), enabled = false),
+    Alarm(2, 9, 0, DayOfWeek.entries.drop(5).toSet(), enabled = false),
+)
+
+/** The phone's next alarm from another app, unless an alarm at the same time already exists. */
+internal fun importableAlarm(alarms: List<Alarm>, at: Long?, zone: ZoneId = ZoneId.systemDefault()): ZonedDateTime? {
+    val time = at?.let { Instant.ofEpochMilli(it).atZone(zone) } ?: return null
+    return time.takeIf { alarms.none { a -> a.hour == time.hour && a.minute == time.minute } }
+}
+
 /** Idle when [endsAt] and [left] are both null; running when [endsAt] is set; paused when [left] is set. */
 data class ClockTimer(val duration: Long = 5 * 60_000L, val endsAt: Long? = null, val left: Long? = null) {
     val idle get() = endsAt == null && left == null
