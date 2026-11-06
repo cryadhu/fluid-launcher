@@ -105,11 +105,6 @@ import com.example.launcher.ui.theme.Tokens as T
                     SettingsToggle("Swipe up for app drawer", p.swipeUp) { model.updateHomePreferences(p.copy(swipeUp = it)) }
                     if (!p.swipeUp) Text("Use the Home search bar or the App drawer button below.", style = T.caption)
                     TextButton(onClick = { model.showHomePanel(null); model.drawer(true) }) { Text("Open app drawer", color = T.amber) }
-                    SettingsToggle("Double-tap to lock screen", p.doubleTapLock) {
-                        if (android.os.Build.VERSION.SDK_INT < 28) model.message("Double-tap lock requires Android 9 or later")
-                        else { model.updateHomePreferences(p.copy(doubleTapLock = it)); if (it && !LauncherLockService.available()) model.openLockAccess() }
-                    }
-                    if (p.doubleTapLock && !LauncherLockService.available()) TextButton(onClick = model::openLockAccess) { Text("Enable Double-tap lock in Accessibility", color = T.amber) }
                     SettingsToggle("Notification dots", p.notificationDots) { model.updateHomePreferences(p.copy(notificationDots = it)); if (it && !state.device.mediaAccess) model.openNotificationAccess() }
                     if (p.notificationDots && !state.device.mediaAccess) TextButton(onClick = model::openNotificationAccess) { Text("Enable notification access", color = T.amber) }
                 }

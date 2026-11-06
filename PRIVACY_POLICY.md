@@ -53,8 +53,6 @@ Optional permissions enable features such as calendar and favorite-contact widge
 
 Notification access enables notification display, dismissal and media controls. Exact-alarm and full-screen-alarm access allow alarms and timers to ring on time and appear on the lock screen. Wallpaper and system-settings access support wallpaper and brightness controls. App removal actions use Android's uninstall confirmation rather than silently removing applications.
 
-**Accessibility:** The optional double-tap-to-lock service performs Android's lock-screen action when you use that gesture. Its configuration does not allow retrieval of window content, and it does not read screen text, capture keystrokes or upload accessibility events. You can disable it in Android's Accessibility settings.
-
 ## Storage, retention and deletion
 
 Settings, tasks, saved contacts where applicable, clock data, widget records, wallpaper copies and content caches remain in the app's local storage until removed, replaced or cleared. Disabling a permission stops the corresponding permitted access but does not necessarily delete previously saved local items.

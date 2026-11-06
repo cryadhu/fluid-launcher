@@ -6,10 +6,16 @@ import org.junit.Test
 
 class HomePreferencesTest {
     @Test fun allHomeSettingsPersistAndLegacySettingsKeepExistingBehavior() {
-        val prefs = HomePreferences(2,3,"Bottom","Small","Circle",64,false,false,true,false,0xFF7FD6B8.toInt(),setOf(0,2))
+        val prefs = HomePreferences(2,3,"Bottom","Small","Circle",64,false,false,false,0xFF7FD6B8.toInt(),setOf(0,2))
         val config = HomeCustomization(preferences = prefs)
         assertEquals(config, decodeCustomization(encodeCustomization(config)))
         assertEquals(HomePreferences(), decodeCustomization("{}").preferences)
+    }
+    @Test fun removedLockSettingIsIgnoredWithoutChangingNotificationDots() {
+        val prefs = parsePreferences(JSONObject("""{"lock":true,"dots":false}"""))
+        assertFalse(prefs.notificationDots)
+        assertFalse(preferencesJson(prefs).has("lock"))
+        assertEquals(prefs, parsePreferences(preferencesJson(prefs)))
     }
     @Test fun malformedPreferencesAreBoundedAndCannotHideHome() {
         val p = parsePreferences(JSONObject("""{"rows":20,"dock":9,"size":-5,"search":"other","clock":"other","shape":"other","hidden":[0,1,2,3,99]}"""))

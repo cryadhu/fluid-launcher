@@ -367,8 +367,6 @@ class LauncherViewModel(app: Application, private val saved: SavedStateHandle) :
         changeCustomization(config.copy(theme = if (mode == "Light") "Sand" else "Tonal", followSystemTheme = mode == "Auto", wallpaper = "Theme"))
     }
     fun openNotificationAccess() = action { device.open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
-    fun openLockAccess() = action { device.open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-    fun lockPhone() { if (!LauncherLockService.lock()) message("Enable Double-tap lock in Android Accessibility settings") }
     fun selectTheme(name: String) {
         if (name !in listOf("Tonal", "Solar", "Ember", "Sand", "Custom")) return
         changeCustomization(mutable.value.customization.copy(theme = name, followSystemTheme = false, wallpaper = "Theme", preferences = mutable.value.customization.preferences.copy(accentColor = null)))

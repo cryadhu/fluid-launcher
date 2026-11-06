@@ -34,7 +34,6 @@ import androidx.compose.ui.input.nestedscroll.*
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
@@ -181,27 +180,7 @@ private fun date(now: Long, pattern: String) = Instant.ofEpochMilli(now).atZone(
             }
         } }
     }
-    Box(Modifier.fillMaxSize().blur(homeBlur).background(homeWallpaper(state.customization.wallpaper)).onGloballyPositioned { screenSize = it.size }.pointerInput(state.customization.preferences.doubleTapLock) {
-        if (!currentState.customization.preferences.doubleTapLock) return@pointerInput
-        var lastTap = 0L; var lastPoint = Offset.Zero
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            var moved = false; var endedAt = down.uptimeMillis
-            do {
-                val event = awaitPointerEvent(PointerEventPass.Final)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                moved = moved || (change.position - down.position).getDistance() > dragSlop
-                endedAt = change.uptimeMillis
-                val pressed = change.pressed
-            } while (pressed)
-            val home = currentState.customization.pages.any { it.id == currentState.page && it.isHome }
-            val empty = drag.hits.values.none { !it.drawer && it.rect.contains(down.position) } && drag.widgetHits.values.none { it.contains(down.position) }
-            if (home && empty && !currentState.drawer && !moved && endedAt - down.uptimeMillis < 250) {
-                if (lastTap > 0 && endedAt - lastTap < 350 && (down.position - lastPoint).getDistance() < dragSlop * 2) { model.lockPhone(); lastTap = 0 }
-                else { lastTap = endedAt; lastPoint = down.position }
-            } else lastTap = 0
-        }
-    }.pointerInput(pager) {
+    Box(Modifier.fillMaxSize().blur(homeBlur).background(homeWallpaper(state.customization.wallpaper)).onGloballyPositioned { screenSize = it.size }.pointerInput(pager) {
         var pending: AppHit? = null
         var origin = Offset.Zero
         var movement = Offset.Zero

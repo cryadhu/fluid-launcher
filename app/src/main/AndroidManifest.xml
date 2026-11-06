@@ -47,10 +47,6 @@
         <service android:name=".data.MediaAccessService" android:label="Fluid Launcher media controls" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
         </service>
-        <service android:name=".data.LauncherLockService" android:label="Double-tap lock" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
-            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
-            <meta-data android:name="android.accessibilityservice" android:resource="@xml/lock_accessibility"/>
-        </service>
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask" android:stateNotNeeded="true" android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

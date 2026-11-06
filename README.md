@@ -32,7 +32,7 @@ Choose Fluid Launcher as your default Home app in Android settings. Calendar, no
 
 ## Build
 
-Requirements: JDK 17 or later, Android SDK platform 35 and the Gradle wrapper.
+Requirements: JDK 17 or later, Android SDK platform 36 and the Gradle wrapper.
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest :app:lintRelease :app:bundleRelease :app:assembleRelease
