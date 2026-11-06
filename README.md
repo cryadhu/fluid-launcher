@@ -20,7 +20,7 @@ A native Android home launcher built with Kotlin and Jetpack Compose, with frost
 - Built-in Clock with alarms, world clocks, stopwatch and timer. Includes switched-off starter alarms and optional import of the next system alarm.
 - Wallpaper, accent and light/dark appearance controls, with locally persisted preferences.
 
-Version: **1.0.0**. Build number: **1**. Application ID: `com.cry.fluid`. Requires Android 8.0 or later.
+Version: **1.0.0**. Build number: **2**. Application ID: `com.cry.fluid`. Requires Android 8.0 or later.
 
 ## Privacy
 
