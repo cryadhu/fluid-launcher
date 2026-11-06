@@ -1,6 +1,14 @@
+![Fluid Launcher — A softer kind of home](docs/images/feature.png)
+
 # Fluid Launcher
 
 A native Android home launcher built with Kotlin and Jetpack Compose, with frosted-glass styling, customizable pages and animated widgets.
+
+## Screenshots
+
+| Home | Plan | App drawer |
+| --- | --- | --- |
+| <img src="docs/images/home.png" alt="Home with clock, weather and notification widgets" width="260"> | <img src="docs/images/plan.png" alt="Plan with favorites, tasks and quick actions" width="260"> | <img src="docs/images/app-drawer.png" alt="Searchable app drawer with favorites and app collections" width="260"> |
 
 ## Changelog
 
