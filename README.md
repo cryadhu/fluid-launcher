@@ -22,6 +22,10 @@ A native Android home launcher built with Kotlin and Jetpack Compose, with frost
 
 Version: **1.0.0**. Build number: **1**. Application ID: `com.cry.fluid`. Requires Android 8.0 or later.
 
+## Privacy
+
+Read the [Fluid Launcher Privacy Policy](PRIVACY_POLICY.md) for information about permissions, on-device storage, third-party services and deleting local data.
+
 ## Setup and permissions
 
 Choose Fluid Launcher as your default Home app in Android settings. Calendar, notifications, media controls, activity tracking and alarms use Android permissions or special access where required. App collections are launcher groups, not Android managed profiles. System settings and restricted device controls remain managed by Android.
