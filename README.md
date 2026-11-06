@@ -24,7 +24,7 @@ Version: **1.0.0**. Build number: **1**. Application ID: `com.cry.fluid`. Requir
 
 ## Privacy
 
-Read the [Fluid Launcher Privacy Policy](PRIVACY_POLICY.md) for information about permissions, on-device storage, third-party services and deleting local data.
+Read the [Fluid Launcher Privacy Policy](https://cryadhu.github.io/fluid-launcher/) for information about permissions, on-device storage, third-party services and deleting local data.
 
 ## Setup and permissions
 
