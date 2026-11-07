@@ -136,6 +136,30 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val view = LocalView.current
+    if (panel == "Clock" || panel?.startsWith("Clock:") == true) {
+        val dark = state.config.mode == "Dark" || state.config.mode == "Auto" && isSystemInDarkTheme()
+        DisposableEffect(view, dark) {
+            val controller = (view.context as? android.app.Activity)?.let {
+                androidx.core.view.WindowCompat.getInsetsController(it.window, view)
+            }
+            val status = controller?.isAppearanceLightStatusBars
+            val navigation = controller?.isAppearanceLightNavigationBars
+            controller?.isAppearanceLightStatusBars = !dark
+            controller?.isAppearanceLightNavigationBars = !dark
+            onDispose {
+                status?.let { controller?.isAppearanceLightStatusBars = it }
+                navigation?.let { controller?.isAppearanceLightNavigationBars = it }
+            }
+        }
+        SideEffect {
+            (view.context as? android.app.Activity)?.let {
+                androidx.core.view.WindowCompat.getInsetsController(it.window, view).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+        }
+    }
     val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshDevice() }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshDevice() }
     val activityPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { model.startSteps() }

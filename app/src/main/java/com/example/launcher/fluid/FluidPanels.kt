@@ -95,6 +95,10 @@ import kotlinx.coroutines.delay
 }
 
 @Composable internal fun FluidPanel(name:String,state:FluidState,model:FluidModel,chooseHome:()->Unit,close:()->Unit,navigate:(String)->Unit,calendar:()->Unit,activity:()->Unit,back:()->Unit,spaceStart:Long?=null,clockStart:String?=null) {
+    if (name == "Clock") {
+        ClockPanel(state, model, clockStart)
+        return
+    }
     val customizePage=name.removePrefix("Customize:").takeIf { name.startsWith("Customize:") } ?: "Home"
     Box(Modifier.fillMaxSize().background(Color(0xFF40315E).copy(alpha=.08f)).statusBarsPadding().padding(top=10.dp)) {
         Column(Modifier.fillMaxSize().glass(36.dp,strength=1.15f).testTag("fluid-panel-$name")) {
@@ -111,7 +115,6 @@ import kotlinx.coroutines.delay
                         }
                     }
                     "Spaces" -> SpaceTabsEditor(state,model,spaceStart)
-                    "Clock" -> ClockPanel(state,model,clockStart)
                     "Wallpaper" -> { WallpaperSettings(state,model) }
                     "Dock" -> { DockSettings(state, model) }
                     "Market & news settings" -> { MarketNewsSettings(state, model) }
