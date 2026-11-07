@@ -317,7 +317,7 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     val interaction=remember { MutableInteractionSource() }
     var source by remember { mutableStateOf(Rect.Zero) }
     val fixed=widgetFixedHeight(kind)?.let { if(kind==FluidWidget.CLOCK && widgetSize(kind,state.config)=="Large") 240.dp else it }
-    val opensDetail=kind==FluidWidget.WEATHER || fixed==null && kind!=FluidWidget.TASKS && kind!=FluidWidget.AGENDA && kind!=FluidWidget.SPACE_APPS
+    val opensDetail=kind==FluidWidget.WEATHER || fixed==null && kind!=FluidWidget.TASKS && kind!=FluidWidget.AGENDA && kind!=FluidWidget.SPACE_APPS && kind!=FluidWidget.NEXT_MATCHES
     val surface=if(kind==FluidWidget.MUSIC_OPEN || kind==FluidWidget.CLOCK) Modifier else Modifier.glass(30.dp,true)
     val openClock=LocalClockPanel.current
     val click={ when {
@@ -327,8 +327,11 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     } }
     val size=if(fixed!=null) Modifier.height(fixed).clip(RoundedCornerShape(30.dp)) else Modifier.animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp)
     Column(modifier.fillMaxWidth().onGloballyPositioned { source=Rect(it.positionInRoot(),it.size.toSize());hero.bounds[kind]=source }.graphicsLayer { alpha=if(hero.kind==kind) 0f else 1f }
-        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick=click,onLongClick={if(pageEditor==null)edit(kind)}).then(size).testTag("fluid-widget-${kind.name}")) {
-        WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity,compact=state.config.sizes[kind]=="Compact")
+        .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick=click,onLongClick={if(pageEditor==null)edit(kind)}).then(size).testTag("fluid-widget-${kind.name}")
+        .then(if(hero.kind==kind) Modifier.clearAndSetSemantics {} else Modifier)) {
+        CompositionLocalProvider(LocalLeagueExpand provides { hero.open(kind,source) }) {
+            WidgetBody(kind,state,model,calendarAccess=calendar,activityAccess=activity,compact=state.config.sizes[kind]=="Compact")
+        }
     }
 }
 

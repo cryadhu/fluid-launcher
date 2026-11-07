@@ -20,6 +20,10 @@ import kotlin.math.roundToInt
 /** A single card moves between source bounds and a safe, expanded viewport. */
 @Composable internal fun FluidHeroOverlay(hero:FluidHero,state:FluidState,model:FluidModel,calendar:()->Unit,activity:()->Unit) {
     val kind=hero.kind ?: return
+    if(kind==FluidWidget.PREMIER_LEAGUE) {
+        LeagueWidgetHero(hero,state,model)
+        return
+    }
     val progress=remember(kind){Animatable(0f)}
     val scroll=rememberScrollState()
     LaunchedEffect(kind,hero.expanded){

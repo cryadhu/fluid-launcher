@@ -17,7 +17,7 @@ internal fun fixtureDate(game: ArsenalFixture): String = Instant.ofEpochMilli(ga
 internal fun fixtureTime(game: ArsenalFixture): String = if (!game.timeConfirmed) "Time TBC" else Instant.ofEpochMilli(game.kickoff).atZone(ZoneId.of("Asia/Kolkata")).format(DateTimeFormatter.ofPattern("h:mm a 'IST'", Locale.ENGLISH))
 internal fun upcomingArsenal(games: List<ArsenalFixture>, now: Long) = games.filter { it.kickoff > now }.distinctBy { it.id }.sortedBy { it.kickoff }.take(4)
 
-internal fun parseArsenalFixtures(raw: String, fetchedAt: Long): ArsenalSchedule {
+internal fun parseArsenalFixtures(raw: String, fetchedAt: Long, clubId: String = "359"): ArsenalSchedule {
     val events = JSONObject(raw).getJSONArray("events")
     val games = (0 until events.length()).mapNotNull { index ->
         val event = events.getJSONObject(index)
@@ -30,20 +30,21 @@ internal fun parseArsenalFixtures(raw: String, fetchedAt: Long): ArsenalSchedule
             return FixtureClub(team.getString("id"), team.getString("displayName"), team.optJSONArray("logos")?.optJSONObject(0)?.optString("href").orEmpty())
         }
         val home = club("home"); val away = club("away")
-        if (home.id != "359" && away.id != "359") return@mapNotNull null
+        if (home.id != clubId && away.id != clubId) return@mapNotNull null
         ArsenalFixture(event.getString("id"), java.time.OffsetDateTime.parse(match.getString("date")).toInstant().toEpochMilli(), match.optBoolean("timeValid", event.optBoolean("timeValid", false)), home, away, event.optJSONObject("league")?.optString("abbreviation").orEmpty())
     }
     return ArsenalSchedule(games.sortedBy { it.kickoff }.distinctBy { it.id }, fetchedAt)
 }
-class ArsenalFixturesRepository(context: Context) {
-    private val cache = File(context.filesDir, "arsenal_fixtures.json")
+class ArsenalFixturesRepository(context: Context, private val clubId: String = "359") {
+    init { require(clubId.matches(Regex("[0-9]+"))) }
+    private val cache = File(context.filesDir, if(clubId=="359") "arsenal_fixtures.json" else "fixtures-$clubId.json")
     suspend fun cached(): ArsenalSchedule = withContext(Dispatchers.IO) {
-        runCatching { val json = JSONObject(cache.readText()); parseArsenalFixtures(json.getString("payload"), json.getLong("fetchedAt")) }.getOrDefault(ArsenalSchedule())
+        runCatching { val json = JSONObject(cache.readText()); parseArsenalFixtures(json.getString("payload"), json.getLong("fetchedAt"), clubId) }.getOrDefault(ArsenalSchedule())
     }
     suspend fun refresh(): ArsenalSchedule = withContext(Dispatchers.IO) {
-        val raw = getHttps("https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/359/schedule?fixture=true")
-        val schedule = parseArsenalFixtures(raw, System.currentTimeMillis())
-        val temp = File(cache.parentFile, "arsenal_fixtures.tmp")
+        val raw = getHttps("https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/$clubId/schedule?fixture=true")
+        val schedule = parseArsenalFixtures(raw, System.currentTimeMillis(), clubId)
+        val temp = File(cache.parentFile, "${cache.nameWithoutExtension}.tmp")
         temp.writeText(JSONObject().put("payload", raw).put("fetchedAt", schedule.fetchedAt).toString())
         check(temp.renameTo(cache)); schedule
     }

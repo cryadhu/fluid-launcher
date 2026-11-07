@@ -21,12 +21,13 @@ enum class FluidWidget(val title: String, val subtitle: String, val glyph: Strin
     WEATHER("Weather", "A window outside", "weather"), TASKS("Tasks", "Make room for focus", "tasks"),
     ACTIVITY("Activity", "Steps while the launcher is active", "health"), STORAGE("Storage", "Space for what matters", "files"), DATE("Date", "A moment in time", "calendar"),
     SPACE_APPS("Space apps", "Your apps, grouped in tabs", "app"),
+    PREMIER_LEAGUE("Premier League", "Live standings with club badges", "health"), NEXT_MATCHES("Next 4 matches", "Your club's Premier League fixtures", "calendar"),
     SUN_PATH("Sun path", "Sunrise to sunset", "weather"), WIND("Wind", "Speed and direction", "weather"),
     FOCUS("Focus", "A 25 minute focus ring", "clock"), BREATHE("Breathe", "A calm breathing guide", "health"), WORLD_CLOCKS("World clocks", "Time around the world", "clock"),
     NOW_PLAYING("Now playing", "Your music, spinning", "music"), BATTERY("Battery", "Charge at a glance", "health"), HYDRATION("Water", "Glasses through the day", "health"), ACTIVITY_RINGS("Activity rings", "Move, exercise and stand", "health")
 }
 internal val halfWidgets=setOf(FluidWidget.CLOCK,FluidWidget.WEATHER,FluidWidget.FOCUS,FluidWidget.BATTERY,FluidWidget.HYDRATION)
-private val fixedWidgets=mapOf(FluidWidget.SUN_PATH to "4×2",FluidWidget.WIND to "4×1",FluidWidget.BREATHE to "4×2",FluidWidget.WORLD_CLOCKS to "4×1",FluidWidget.NOW_PLAYING to "4×2",FluidWidget.ACTIVITY_RINGS to "4×2")
+private val fixedWidgets=mapOf(FluidWidget.PREMIER_LEAGUE to "4×3",FluidWidget.NEXT_MATCHES to "4×3",FluidWidget.SUN_PATH to "4×2",FluidWidget.WIND to "4×1",FluidWidget.BREATHE to "4×2",FluidWidget.WORLD_CLOCKS to "4×1",FluidWidget.NOW_PLAYING to "4×2",FluidWidget.ACTIVITY_RINGS to "4×2")
 private val controlKinds=setOf(FluidWidget.WIFI,FluidWidget.BLUETOOTH,FluidWidget.MOBILE_DATA,FluidWidget.SOUND,FluidWidget.FLASHLIGHT,FluidWidget.AIRPLANE)
 /** Size names a widget can take; an empty list means the widget has one fixed size. */
 internal fun sizeOptions(kind:FluidWidget):List<String> = when(kind) {
@@ -53,12 +54,12 @@ internal fun validSpaceName(name: String, spaces: List<SpaceTab>, except: Long? 
     trimmed.isNotEmpty() && !trimmed.equals("All", true) && spaces.none { it.id != except && it.name.equals(trimmed, true) }
 }
 data class FluidConfig(val widgets: List<FluidWidget> = listOf(FluidWidget.CLOCK, FluidWidget.WEATHER, FluidWidget.NOTIFICATIONS, FluidWidget.AGENDA), val mode: String = "Auto", val labels: Boolean = true,
-    val city: String = "", val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 4, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true, val spaceWidgets: List<FluidWidget> = listOf(FluidWidget.SPACE_APPS, FluidWidget.TASKS), val homeWallpaper:String="Dawn", val lockWallpaper:String="Dawn", val homeWallpaperBlur:Boolean=false, val lockWallpaperBlur:Boolean=false, val favoriteApps:Set<String> = emptySet(), val pages:List<String> = listOf("Markets","Home","Space","Plan"), val accent:String="#8051FF", val planWidgets:List<FluidWidget> = listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES), val pageWidgets:Map<String,List<FluidWidget>> = emptyMap(), val spaces:List<SpaceTab> = defaultSpaces)
+    val city: String = "", val dock: List<String> = listOf("@auto"), val sizes: Map<FluidWidget,String> = emptyMap(), val stockSymbols: String = "RELIANCE.NS,TCS.NS,HDFCBANK.NS", val market: String = "India", val newsTopics: Set<NewsCategory> = setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), val dockCount: Int = 4, val dockLabels: Boolean = false, val dockIconSize: Int = 48, val autoWeather: Boolean = true, val spaceWidgets: List<FluidWidget> = listOf(FluidWidget.SPACE_APPS, FluidWidget.TASKS), val homeWallpaper:String="Dawn", val lockWallpaper:String="Dawn", val homeWallpaperBlur:Boolean=false, val lockWallpaperBlur:Boolean=false, val favoriteApps:Set<String> = emptySet(), val pages:List<String> = listOf("Markets","Home","Space","Plan"), val accent:String="#8051FF", val planWidgets:List<FluidWidget> = listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES), val pageWidgets:Map<String,List<FluidWidget>> = emptyMap(), val spaces:List<SpaceTab> = defaultSpaces, val footballClub:String = "359")
 fun encodeFluid(config: FluidConfig): String = JSONObject().apply {
     put("spaces",JSONArray(config.spaces.map{ JSONObject().put("id",it.id).put("name",it.name).put("apps",JSONArray(it.apps.toList())) }));put("spaceWidgets",JSONArray(config.spaceWidgets.map{it.name}));put("spaceAppsVersion",1)
     put("themeVersion",1);put("wallpaperVersion",3);put("dockDefaultsVersion",2)
     put("homeWallpaper",config.homeWallpaper);put("lockWallpaper",config.lockWallpaper);put("homeWallpaperBlur",config.homeWallpaperBlur);put("lockWallpaperBlur",config.lockWallpaperBlur)
-    put("autoWeather",config.autoWeather)
+    put("autoWeather",config.autoWeather);put("footballClub",config.footballClub)
     put("dockCount", config.dockCount); put("dockLabels", config.dockLabels); put("dockIconSize", config.dockIconSize); put("market", config.market); put("stockSymbols", config.stockSymbols); put("newsTopics", JSONArray(config.newsTopics.map { it.name })); put("homeVersion", 2); put("sizes", JSONObject(config.sizes.mapKeys { it.key.name }))
     put("widgets", JSONArray(config.widgets.map { it.name })); put("mode", config.mode); put("labels", config.labels); put("city", config.city)
     put("dock", JSONArray(config.dock));put("favoriteApps",JSONArray(config.favoriteApps.toList()));put("pages",JSONArray(config.pages));put("accent",config.accent);put("planWidgets",JSONArray(config.planWidgets.map{it.name}));put("pageWidgets",JSONObject(config.pageWidgets.mapValues{JSONArray(it.value.map{widget->widget.name})}))
@@ -72,7 +73,7 @@ fun decodeFluid(raw: String): FluidConfig = runCatching {
     val pageWidgets=j.optJSONObject("pageWidgets")?.let { objectValue -> objectValue.keys().asSequence().associateWith { page -> (objectValue.optJSONArray(page)?.let { array -> (0 until array.length()).mapNotNull { index -> FluidWidget.entries.find { it.name==array.optString(index) } } } ?: emptyList()).distinct() } } ?: emptyMap()
     FluidConfig(widgets,
         (if(j.has("themeVersion"))j.optString("mode", "Auto")else "Auto").takeIf { it in listOf("Light", "Dark", "Auto") } ?: "Auto", j.optBoolean("labels", true),
-        j.optString("city"), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",4).let { if(!j.has("dockDefaultsVersion") && it==3 && list("dock")==listOf("@auto"))4 else it }.coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true),(if(j.has("spaceWidgets"))list("spaceWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}.distinct()else listOf(FluidWidget.TASKS)).let{ if(j.has("spaceAppsVersion") || FluidWidget.SPACE_APPS in it) it else listOf(FluidWidget.SPACE_APPS)+it }).copy(homeWallpaper=j.optString("homeWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",lockWallpaper=j.optString("lockWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",homeWallpaperBlur=j.optBoolean("homeWallpaperBlur",false),lockWallpaperBlur=j.optBoolean("lockWallpaperBlur",false),favoriteApps=list("favoriteApps").toSet(),pages=(if(j.has("pages"))list("pages")else listOf("Markets","Home","Space","Plan")).let{listOf("Markets","Home")+it.filter{page->page !in listOf("Markets","Home")}.distinct()},accent=j.optString("accent","#8051FF").takeIf{runCatching{android.graphics.Color.parseColor(it)}.isSuccess} ?: "#8051FF",planWidgets=(if(j.has("planWidgets"))list("planWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}else listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES)).distinct(),pageWidgets=pageWidgets,spaces=decodeSpaces(j))
+        j.optString("city"), if(j.has("dock")) list("dock").distinct().take(6) else listOf("@auto"), sizes, j.optString("stockSymbols", "RELIANCE.NS,TCS.NS,HDFCBANK.NS"), j.optString("market", "India"), if(j.has("newsTopics")) list("newsTopics").mapNotNull(NewsCategory::fromKey).toSet() else setOf(NewsCategory.WORLD, NewsCategory.BUSINESS), j.optInt("dockCount",4).let { if(!j.has("dockDefaultsVersion") && it==3 && list("dock")==listOf("@auto"))4 else it }.coerceIn(1,6), j.optBoolean("dockLabels",false), j.optInt("dockIconSize",48).coerceIn(36,56),j.optBoolean("autoWeather",true),(if(j.has("spaceWidgets"))list("spaceWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}.distinct()else listOf(FluidWidget.TASKS)).let{ if(j.has("spaceAppsVersion") || FluidWidget.SPACE_APPS in it) it else listOf(FluidWidget.SPACE_APPS)+it }).copy(homeWallpaper=j.optString("homeWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",lockWallpaper=j.optString("lockWallpaper","Dawn").let{if(it=="Original")"Default"else it}.takeIf{validWallpaper(it)} ?: "Dawn",homeWallpaperBlur=j.optBoolean("homeWallpaperBlur",false),lockWallpaperBlur=j.optBoolean("lockWallpaperBlur",false),favoriteApps=list("favoriteApps").toSet(),pages=(if(j.has("pages"))list("pages")else listOf("Markets","Home","Space","Plan")).let{listOf("Markets","Home")+it.filter{page->page !in listOf("Markets","Home")}.distinct()},accent=j.optString("accent","#8051FF").takeIf{runCatching{android.graphics.Color.parseColor(it)}.isSuccess} ?: "#8051FF",planWidgets=(if(j.has("planWidgets"))list("planWidgets").mapNotNull{name->FluidWidget.entries.find{it.name==name}}else listOf(FluidWidget.AGENDA,FluidWidget.TASKS,FluidWidget.QUICK_ACTIONS,FluidWidget.FAVORITES)).distinct(),pageWidgets=pageWidgets,spaces=decodeSpaces(j),footballClub=j.optString("footballClub","359").takeIf{it.matches(Regex("[0-9]+"))} ?: "359")
 }.getOrDefault(FluidConfig())
 
 private fun decodeSpaces(j: JSONObject): List<SpaceTab> {
@@ -92,7 +93,9 @@ data class FluidState(val config: FluidConfig = FluidConfig(), val apps: List<In
     val device: DeviceState = DeviceState(), val now: Long = System.currentTimeMillis(), val homeEpoch: Int = 0, val wallpaperApplying:Boolean=false,
     val tasks: List<FluidTask> = emptyList(), val weather: HomeWeather? = null, val weatherLoading: Boolean = false,
     val weatherError: String? = null, val storageUsed: Long = 0, val storageTotal: Long = 1, val message: String? = null,
-    val steps: Int? = null, val standHours: Int = 0, val water: Int = 0, val focusEnd: Long? = null, val focusLeft: Long = FOCUS_LENGTH, val panelRequest: String? = null)
+    val steps: Int? = null, val standHours: Int = 0, val water: Int = 0, val focusEnd: Long? = null, val focusLeft: Long = FOCUS_LENGTH, val panelRequest: String? = null,
+    val league: LeagueTable = LeagueTable(), val leagueLoading: Boolean = false, val leagueError: Boolean = false,
+    val fixtures: ArsenalSchedule = ArsenalSchedule(), val fixturesLoading: Boolean = false, val fixturesError: Boolean = false)
 internal const val FOCUS_LENGTH = 25 * 60_000L
 internal const val WATER_GOAL = 8
 
@@ -109,6 +112,67 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     private var appsJob: Job? = null
     private var deviceJob: Job? = null
     private var toastJob: Job? = null
+    private val leagueRepository = PremierLeagueRepository(app)
+    private var leagueJob: Job? = null
+    private var fixturesJob: Job? = null
+    private var lastLeagueAttempt = 0L
+    private var lastFixturesAttempt = 0L
+
+    fun refreshLeague(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if(leagueJob?.isActive==true || !force && now-lastLeagueAttempt<60_000L)return
+        if(!force && now-mutable.value.league.fetchedAt<15*60_000L)return
+        lastLeagueAttempt=now
+        leagueJob=viewModelScope.launch {
+            mutable.update { it.copy(leagueLoading=true,leagueError=false) }
+            try {
+                if(mutable.value.league.fetchedAt==0L) {
+                    val cached=leagueRepository.cached()
+                    mutable.update { it.copy(league=cached) }
+                }
+                if(force || now-mutable.value.league.fetchedAt>=15*60_000L) {
+                    val table=leagueRepository.refresh()
+                    mutable.update { it.copy(league=table) }
+                }
+                mutable.update { it.copy(leagueLoading=false) }
+            } catch(e:Exception) {
+                if(e is CancellationException)throw e
+                mutable.update { it.copy(leagueLoading=false,leagueError=true) }
+            }
+        }
+    }
+    fun refreshFixtures(force: Boolean = false) {
+        val now=System.currentTimeMillis()
+        if(fixturesJob?.isActive==true || !force && now-lastFixturesAttempt<60_000L)return
+        if(!force && now-mutable.value.fixtures.fetchedAt<15*60_000L)return
+        lastFixturesAttempt=now
+        val club=mutable.value.config.footballClub
+        fixturesJob=viewModelScope.launch {
+            mutable.update { it.copy(fixturesLoading=true,fixturesError=false) }
+            try {
+                val repository=ArsenalFixturesRepository(getApplication(),club)
+                if(mutable.value.fixtures.fetchedAt==0L) {
+                    val cached=repository.cached()
+                    mutable.update { it.copy(fixtures=cached) }
+                }
+                if(force || now-mutable.value.fixtures.fetchedAt>=15*60_000L) {
+                    val fixtures=repository.refresh()
+                    mutable.update { it.copy(fixtures=fixtures) }
+                }
+                mutable.update { it.copy(fixturesLoading=false) }
+            } catch(e:Exception) {
+                if(e is CancellationException)throw e
+                mutable.update { it.copy(fixturesLoading=false,fixturesError=true) }
+            }
+        }
+    }
+    fun selectFootballClub(id:String) {
+        if(id==mutable.value.config.footballClub || id!="359" && mutable.value.league.clubs.none{it.id==id})return
+        fixturesJob?.cancel();lastFixturesAttempt=0L
+        configure { it.copy(footballClub=id) }
+        mutable.update { it.copy(fixtures=ArsenalSchedule(),fixturesLoading=false,fixturesError=false) }
+        refreshFixtures()
+    }
     init {
         val tasks = runCatching { JSONArray(prefs.getString("tasks", "[]")).let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { FluidTask(it.getLong("id"), it.getString("text"), it.getBoolean("done")) } } } }.getOrDefault(emptyList())
         val today = LocalDate.now().toString()
@@ -121,7 +185,14 @@ class FluidModel(app: Application) : AndroidViewModel(app), android.hardware.Sen
     }
     fun returnHome() { mutable.update { it.copy(homeEpoch = it.homeEpoch + 1) } }
     fun requestPanel(name: String?) { mutable.update { it.copy(panelRequest = name) } }
-    fun tick() { mutable.update { it.copy(now = System.currentTimeMillis()) }; refreshDevice(); startSteps(); if(System.currentTimeMillis()-lastWeatherAttempt>15*60_000L)refreshWeather() }
+    fun tick() {
+        mutable.update { it.copy(now = System.currentTimeMillis()) };refreshDevice();startSteps()
+        if(System.currentTimeMillis()-lastWeatherAttempt>15*60_000L)refreshWeather()
+        val config=mutable.value.config
+        val widgets=config.widgets+config.spaceWidgets+config.planWidgets+config.pageWidgets.values.flatten()
+        if(widgets.any{it==FluidWidget.PREMIER_LEAGUE || it==FluidWidget.NEXT_MATCHES})refreshLeague()
+        if(FluidWidget.NEXT_MATCHES in widgets)refreshFixtures()
+    }
     fun refreshApps() { appsJob?.cancel(); appsJob = viewModelScope.launch {
         try { val apps = device.apps(nativeIcons = true); mutable.update { it.copy(apps = apps, loading = false) } }
         catch (e: Exception) { if (e is CancellationException) throw e; mutable.update { it.copy(loading = false) }; message("Couldn't load apps. Try again.") }

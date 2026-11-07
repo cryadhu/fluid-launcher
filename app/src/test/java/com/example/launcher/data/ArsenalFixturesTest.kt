@@ -30,5 +30,7 @@ class ArsenalFixturesTest {
         assertEquals("1", games.single().away.id)
         assertEquals("https://badge/1", games.single().away.logo)
         assertTrue(games.single().timeConfirmed)
+        assertEquals(1, parseArsenalFixtures(json.toString(), 42L, "1").games.size)
+        assertTrue(parseArsenalFixtures(json.toString(), 42L, "2").games.isEmpty())
     }
 }

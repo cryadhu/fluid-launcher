@@ -4,6 +4,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FluidConfigTest {
+    @Test fun footballWidgetsAndSelectedClubPersistAcrossPages() {
+        val widgets=listOf(FluidWidget.PREMIER_LEAGUE,FluidWidget.NEXT_MATCHES)
+        val config=FluidConfig(widgets=widgets,spaceWidgets=widgets,planWidgets=widgets,footballClub="382",pageWidgets=mapOf("Football" to widgets))
+        assertEquals(config,decodeFluid(encodeFluid(config)))
+        assertEquals("359",decodeFluid("{}").footballClub)
+        assertEquals("359",decodeFluid("""{"footballClub":"../secret"}""").footballClub)
+        widgets.forEach { assertEquals("4×3",widgetGrid(it)) }
+    }
     @Test fun customWallpapersAndAutomaticThemePersistSafely() {
         val custom="Custom:12345678-abcd-1234-abcd-123456789abc.jpg"
         val config=FluidConfig(homeWallpaper=custom,lockWallpaper="Lavender",mode="Auto")

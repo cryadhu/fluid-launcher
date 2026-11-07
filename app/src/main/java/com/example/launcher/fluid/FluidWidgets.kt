@@ -189,6 +189,8 @@ fun fluidDate(now: Long, format: String) = Instant.ofEpochMilli(now).atZone(Zone
             }
         }
         FluidWidget.SPACE_APPS -> SpaceAppsWidget(state)
+        FluidWidget.PREMIER_LEAGUE -> PremierLeagueWidget(state,model,expanded=detail,open=LocalLeagueExpand.current)
+        FluidWidget.NEXT_MATCHES -> NextMatchesWidget(state,model)
     }
 }
 
