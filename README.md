@@ -12,16 +12,19 @@ A native Android home launcher built with Kotlin and Jetpack Compose, with frost
 
 ## Changelog
 
+### 1.0.1
+
+- Redesigned the built-in Clock as a full-screen app with bottom tab navigation, analog world clocks and large stopwatch and timer dials.
+- Added Premier League football widgets with club crests, animated full-table expansion, the next four fixtures for a selectable club and cached offline data.
+
 ### 1.0.0 — Initial release
 
 - Customizable Home, Plan, Your space and custom pages with a four-column widget grid, widget resizing and drag-to-rearrange controls.
 - Searchable app drawer, favorites, editable app collections and a customizable dock.
 - Animated widgets for weather, music, focus, breathing, world clocks, battery, water and activity, alongside notifications, calendar events and tasks.
-- Full-screen built-in Clock with alarms, analog world clocks, stopwatch laps and timer, with bottom tab navigation. Includes switched-off starter alarms and optional import of the next system alarm.
-- Premier League standings with club crests and animated full-table expansion, plus the next four fixtures for a selectable club.
 - Wallpaper, accent and light/dark appearance controls, with locally persisted preferences.
 
-Version: **1.0.0**. Build number: **3**. Application ID: `com.cry.fluid`. Requires Android 8.0 or later.
+Version: **1.0.1**. Build number: **4**. Application ID: `com.cry.fluid`. Requires Android 8.0 or later.
 
 ## Privacy
 
