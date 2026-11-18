@@ -12,6 +12,11 @@ A native Android home launcher built with Kotlin and Jetpack Compose, with frost
 
 ## Changelog
 
+### 1.0.2
+
+- Smoother animations across the launcher, especially expanding and collapsing notifications, the app drawer, panels, expanded widgets and the analog clock.
+- Notifications no longer refresh needlessly in the background, reducing jank and battery use.
+
 ### 1.0.1
 
 - Redesigned the built-in Clock as a full-screen app with bottom tab navigation, analog world clocks and large stopwatch and timer dials.
@@ -24,7 +29,7 @@ A native Android home launcher built with Kotlin and Jetpack Compose, with frost
 - Animated widgets for weather, music, focus, breathing, world clocks, battery, water and activity, alongside notifications, calendar events and tasks.
 - Wallpaper, accent and light/dark appearance controls, with locally persisted preferences.
 
-Version: **1.0.1**. Build number: **4**. Application ID: `com.cry.fluid`. Requires Android 8.0 or later.
+Version: **1.0.2**. Build number: **5**. Application ID: `com.cry.fluid`. Requires Android 8.0 or later.
 
 ## Privacy
 
