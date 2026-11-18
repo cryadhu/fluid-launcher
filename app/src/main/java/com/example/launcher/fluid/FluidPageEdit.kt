@@ -459,7 +459,7 @@ internal class PageEdit(
 
 /** Lift, FLIP offsets and per-card measurement all live here so the page keeps its layout. */
 @Composable
-internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?, phase: State<Float>, index: Int): Modifier {
+internal fun Modifier.pageEditCard(kind: FluidWidget, edit: PageEdit?): Modifier {
     if (edit == null) return this
     val measured = this.onGloballyPositioned {
         val height = it.size.height.toFloat()

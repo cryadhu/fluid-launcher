@@ -25,14 +25,14 @@ internal fun widgetRows(widgets: List<FluidWidget>, half: (FluidWidget) -> Boole
 
 /** A 4-column page grid: 2×2 widgets sit side by side, wider widgets span the row. */
 @Composable
-internal fun WidgetGrid(widgets: List<FluidWidget>, config: FluidConfig, edit: PageEdit?, spacing: Dp, phase: State<Float>, card: @Composable (FluidWidget) -> Unit) {
+internal fun WidgetGrid(widgets: List<FluidWidget>, config: FluidConfig, edit: PageEdit?, spacing: Dp, card: @Composable (FluidWidget) -> Unit) {
     val rows = widgetRows(widgets) { isHalf(it, config) }
     Column(Modifier.fillMaxWidth().onSizeChanged { edit?.gridWidth = it.width.toFloat() }, verticalArrangement = Arrangement.spacedBy(spacing)) {
         rows.forEach { row ->
             val lifted = edit != null && row.any { it == edit.settling || it == edit.dragging }
             Row(Modifier.fillMaxWidth().zIndex(if (lifted) 2f else 0f), horizontalArrangement = Arrangement.spacedBy(spacing)) {
                 row.forEach { kind -> key(kind) {
-                    Box(Modifier.weight(1f).pageEditCard(kind, edit, phase, widgets.indexOf(kind))) {
+                    Box(Modifier.weight(1f).pageEditCard(kind, edit)) {
                         card(kind)
                         if (edit != null && edit.active) Box(Modifier.matchParentSize().pageEditDrag(kind, edit))
                     }

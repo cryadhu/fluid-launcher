@@ -14,6 +14,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.semantics.*
@@ -56,23 +57,36 @@ internal fun notificationTimestamp(time: Long, zone: java.time.ZoneId = java.tim
                 if(!state.device.mediaAccess) GlassButton("Connect notifications",Modifier.padding(top=12.dp),onClick=model::accessNotifications)
             }
         } else {
-            val progress by animateFloatAsState(if(expanded)1f else 0f,spring(.9f,320f),label="Notification unstack")
+            val progress=animateFloatAsState(if(expanded)1f else 0f,spring(.9f,320f),label="Notification unstack")
+            val unstacked by remember { derivedStateOf { progress.value>.001f } }
+            val readable by remember { derivedStateOf { progress.value>.5f } }
             val cardHeight=132.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
             val previews=notifications.take(3)
-            val closedHeight=compactHeight+(previews.size-1)*7.dp
-            val openHeight=cardHeight*notifications.size+8.dp*(notifications.size-1)
-            val totalHeight=closedHeight+(openHeight-closedHeight)*progress
-            Box(Modifier.fillMaxWidth().height(totalHeight).testTag(if(expanded)"notification-inline-expanded"else"notification-compact-stack")) {
-                val visible=if(expanded || progress>.001f)notifications else previews
-                visible.withIndex().toList().asReversed().forEach { (index,notice) -> key(notice.key) {
-                    val closedY=index.coerceAtMost(2)*7.dp
-                    val openY=(cardHeight+8.dp)*index
-                    val inset=index.coerceAtMost(2)*12.dp*(1f-progress)
-                    val height=compactHeight+(cardHeight-compactHeight)*progress
-                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},progress>.5f,expanded || index==0,
-                        Modifier.offset(y=closedY+(openY-closedY)*progress).padding(horizontal=inset).height(height)
-                            .graphicsLayer { alpha=if(index<3)1f else progress; scaleX=1f-(1f-progress)*index.coerceAtMost(2)*.012f })
+            val visible=if(expanded || unstacked)notifications else previews
+            // Progress is only read during layout and drawing, so unstacking never recomposes the cards.
+            Layout(content={
+                visible.forEachIndexed { index,notice -> key(notice.key) {
+                    DismissibleNotification(notice,model,{edit(FluidWidget.NOTIFICATIONS)},readable,expanded || index==0,
+                        Modifier.graphicsLayer { val p=progress.value; alpha=if(index<3)1f else p; scaleX=1f-(1f-p)*index.coerceAtMost(2)*.012f })
                 } }
+            },modifier=Modifier.fillMaxWidth().testTag(if(expanded)"notification-inline-expanded"else"notification-compact-stack")) { measurables,constraints ->
+                val p=progress.value
+                val compact=compactHeight.toPx(); val open=cardHeight.toPx(); val gap=8.dp.toPx(); val peek=7.dp.toPx()
+                val height=(compact+(open-compact)*p).roundToInt()
+                val placeables=measurables.mapIndexed { index,measurable ->
+                    val inset=(index.coerceAtMost(2)*12.dp.toPx()*(1f-p)).roundToInt()
+                    val width=(constraints.maxWidth-inset*2).coerceAtLeast(0)
+                    measurable.measure(Constraints.fixed(width,height))
+                }
+                val closedHeight=compact+(previews.size-1)*peek
+                val openHeight=open*placeables.size+gap*(placeables.size-1)
+                layout(constraints.maxWidth,(closedHeight+(openHeight-closedHeight)*p).roundToInt()) {
+                    placeables.forEachIndexed { index,placeable ->
+                        val closedY=index.coerceAtMost(2)*peek
+                        val openY=(open+gap)*index
+                        placeable.place((constraints.maxWidth-placeable.width)/2,(closedY+(openY-closedY)*p).roundToInt(),zIndex=(placeables.size-index).toFloat())
+                    }
+                }
             }
         }
     }

@@ -10,12 +10,18 @@ object NotificationBadges {
     val packages = mutable.asStateFlow()
 }
 class MediaAccessService : NotificationListenerService() {
+    // Reusing the same label and bitmap lets unchanged reconciles compare equal and skip recomposition.
+    private val apps = HashMap<String, Pair<String, android.graphics.Bitmap?>>()
+    private fun app(packageName: String) = apps.getOrPut(packageName) {
+        val label = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString() }.getOrDefault(packageName)
+        label to runCatching { installedIconBitmap(packageManager.getApplicationIcon(packageName)) }.getOrNull()
+    }
     private fun publish() {
         val active = runCatching { activeNotifications.orEmpty().toList() }.getOrDefault(emptyList())
         NotificationBadges.mutable.value = active.map { it.packageName }.toSet()
+        apps.keys.retainAll(NotificationBadges.mutable.value)
         com.example.launcher.fluid.FluidNotifications.mutable.value = active.filter { it.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY == 0 }.sortedByDescending { it.postTime }.map { n ->
-            val app = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(n.packageName, 0)).toString() }.getOrDefault(n.packageName)
-            val icon = runCatching { installedIconBitmap(packageManager.getApplicationIcon(n.packageName)) }.getOrNull()
+            val (app, icon) = app(n.packageName)
             val extras = n.notification.extras
             com.example.launcher.fluid.FluidNotification(n.key, app, extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString() ?: app,
                 extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString().orEmpty(), n.postTime, icon, n.notification.contentIntent, n.isClearable)

@@ -48,7 +48,6 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
     val pressSource=LocalPagePress.current
     val ownPress=remember{MutableInteractionSource()}
     val density=LocalDensity.current
-    val phase=rememberInfiniteTransition(label="Widget wobble").animateFloat(0f,6.2831855f,infiniteRepeatable(tween(900,easing=LinearEasing)),label="Wobble")
     SideEffect { edit?.bind(editable,with(density){14.dp.toPx()},scroll) }
     Box(modifier.navigationBarsPadding().padding(bottom=32.dp).onGloballyPositioned{edit?.viewport=it.boundsInRoot()}.testTag("fluid-home")) {
         Column(Modifier.fillMaxSize()) {
@@ -60,14 +59,14 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
                     Text(fluidDate(state.now,"EEEE, MMM d"),style=F.text(12,muted=true),modifier=Modifier.testTag("fluid-home-date"))
                     if(edit?.active!=true) GlassIcon("edit","Customize home",Modifier.size(34.dp),onClick=customize) else Spacer(Modifier.size(34.dp))
                 }
-                WidgetGrid(editable,state.config,edit,14.dp,phase) { kind ->
+                WidgetGrid(editable,state.config,edit,14.dp) { kind ->
                     if(kind==FluidWidget.NOTIFICATIONS) Box(Modifier.onGloballyPositioned { hero.bounds[kind]=it.boundsInRoot() }) { NotificationStack(state,model) }
                     else ExpandableWidget(kind,state,model,hero,calendar,activity)
                 }
                 ControlWidgetRows(state.config.widgets.filter{it in tinyControls},state,model)
             }
-            val dockBlur by animateDpAsState(if(edit?.active==true) 10.dp else 0.dp,spring(1f,300f),label="Dock edit blur")
-            Box(Modifier.blur(dockBlur,BlurredEdgeTreatment.Unbounded)) { FluidDock(state, model, badges, ask, launch) }
+            val dockBlur=animateDpAsState(if(edit?.active==true) 10.dp else 0.dp,spring(1f,300f),label="Dock edit blur")
+            Box(Modifier.liveBlur(unbounded=true) { dockBlur.value }) { FluidDock(state, model, badges, ask, launch) }
         }
     }
 }
@@ -83,11 +82,8 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
         val delta=((secondTarget-secondHand.value+540f)%360f)-180f
         secondHand.animateTo(secondHand.value+delta,tween(850,easing=LinearEasing))
     }
-    val seconds=secondHand.value
-    // Seconds are an angle, so fold them back into the real hour/minute positions
-    // instead of feeding the angle straight into every hand.
-    val minuteAngle=time.minute*6f+seconds/60f
-    val hourAngle=(time.hour%12)*30f+time.minute*.5f+seconds/720f
+    val minute=time.minute
+    val hour=time.hour
     val ink=F.ink
     val face=if(LocalGlass.current.dark)Color(0xFF35403D)else Color.White
     BoxWithConstraints(modifier.then(if(click!=null) Modifier.combinedClickable(onClick=click,onLongClick={edit(FluidWidget.CLOCK)}) else Modifier).semantics{contentDescription="Clock ${fluidDate(now,"HH:mm")}"},contentAlignment=Alignment.Center) {
@@ -98,6 +94,10 @@ internal fun widgetMinimum(kind:FluidWidget,config:FluidConfig):Dp = if(kind==Fl
             repeat(60){i -> val a=Math.toRadians(i*6.0-90);val outer=radius*.88f;val inner=radius*if(i%5==0).79f else .86f
                 drawLine(ink.copy(alpha=if(i%5==0).45f else .14f),center+Offset(cos(a).toFloat()*inner,sin(a).toFloat()*inner),center+Offset(cos(a).toFloat()*outer,sin(a).toFloat()*outer),if(i%5==0)1.3.dp.toPx()else .7.dp.toPx(),StrokeCap.Round)
             }
+            // Read in the draw phase so the ticking hand only redraws this canvas.
+            val seconds=secondHand.value
+            val minuteAngle=minute*6f+seconds/60f
+            val hourAngle=(hour%12)*30f+minute*.5f+seconds/720f
             fun hand(angle:Float,length:Float,width:Float,color:Color){val a=Math.toRadians(angle.toDouble()-90);drawLine(color,center,center+Offset(cos(a).toFloat()*radius*length,sin(a).toFloat()*radius*length),width.dp.toPx(),StrokeCap.Round)}
             hand(hourAngle,.46f,3f,ink)
             hand(minuteAngle,.67f,2f,ink)

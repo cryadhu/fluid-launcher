@@ -25,8 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -70,7 +74,7 @@ internal fun PremierLeagueWidget(
     val scroll = rememberScrollState()
     Column(Modifier.fillMaxWidth()) {
         if (expanded) LeagueDetailHeader(state, Modifier.padding(bottom = 12.dp))
-        LeagueCardContents(state, model, if (expanded) 1f else 0f, scroll, open = open)
+        LeagueCardContents(state, model, rememberUpdatedState(if (expanded) 1f else 0f), scroll, open = open)
     }
 }
 
@@ -178,23 +182,24 @@ internal fun LeagueWidgetHero(hero: FluidHero, state: FluidState, model: FluidMo
         }
         val source = measuredOrigin.takeIf { it.width > 0f && it.height > 0f }
             ?: hero.bounds[kind]?.takeIf { it.width > 0f && it.height > 0f } ?: target
-        val p = progress.value.coerceIn(0f, 1f)
-        val header = (p / .65f).coerceIn(0f, 1f)
-        val bounds = lerp(source, target, p)
+        val p = remember(progress) { derivedStateOf { progress.value.coerceIn(0f, 1f) } }
+        val header = { (p.value / .65f).coerceIn(0f, 1f) }
+        val headerShown by remember(p) { derivedStateOf { p.value > 0f } }
+        val headerReadable by remember(p) { derivedStateOf { p.value / .65f >= .95f } }
+        val settled by remember(p) { derivedStateOf { p.value > .99f } }
         val sourcePadding = if (state.config.sizes[kind] == "Compact") 12f else 20f
         Box(
-            Modifier.fillMaxSize().background(Color(0xFF493475).copy(alpha = .10f * p))
+            Modifier.fillMaxSize().graphicsLayer { alpha = p.value }.background(Color(0xFF493475).copy(alpha = .10f))
                 .pointerInput(hero) { detectTapGestures { hero.expanded = false } }
         )
         Column(
-            Modifier.offset { IntOffset(bounds.left.roundToInt(), bounds.top.roundToInt()) }
-                .size(with(density) { bounds.width.toDp() }, with(density) { bounds.height.toDp() })
+            Modifier.liveBounds { lerp(source, target, p.value) }
                 .pointerInput(hero) { detectTapGestures {} }
         ) {
-            if (header > 0f) {
-                Box(Modifier.fillMaxWidth().height((72f * header).dp).clipToBounds()
-                    .graphicsLayer { alpha = header }
-                    .then(if (header < .95f) Modifier.clearAndSetSemantics {} else Modifier)) {
+            if (headerShown) {
+                Box(Modifier.fillMaxWidth().liveHeight { (72f * header()).dp }.clipToBounds()
+                    .graphicsLayer { alpha = header() }
+                    .then(if (!headerReadable) Modifier.clearAndSetSemantics {} else Modifier)) {
                     LeagueDetailHeader(
                         state, Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true),
                         back = { hero.expanded = false }
@@ -202,13 +207,13 @@ internal fun LeagueWidgetHero(hero: FluidHero, state: FluidState, model: FluidMo
                 }
             }
             Box(
-                Modifier.fillMaxWidth().weight(1f).glass((30f + 4f * p).dp, true)
+                Modifier.fillMaxWidth().weight(1f).glass(30.dp, true)
                     .testTag("fluid-expanded-widget")
-                    .padding((sourcePadding + (20f - sourcePadding) * p).dp)
+                    .livePadding({ (sourcePadding + (20f - sourcePadding) * p.value).dp })
             ) {
                 LeagueCardContents(
                     state, model, p, scroll, Modifier.fillMaxSize(), fillRows = true,
-                    interactive = hero.expanded && p > .99f
+                    interactive = hero.expanded && settled
                 )
             }
         }
@@ -240,7 +245,7 @@ private fun LeagueDetailHeader(state: FluidState, modifier: Modifier = Modifier,
 private fun LeagueCardContents(
     state: FluidState,
     model: FluidModel,
-    progress: Float,
+    progress: State<Float>,
     scroll: ScrollState,
     modifier: Modifier = Modifier,
     fillRows: Boolean = false,
@@ -248,37 +253,44 @@ private fun LeagueCardContents(
     open: () -> Unit = {}
 ) {
     val clubs = remember(state.league.clubs) { state.league.clubs.sortedBy { it.position } }
-    val header = (progress / .65f).coerceIn(0f, 1f)
-    val extra = ((progress - .22f) / .73f).coerceIn(0f, 1f)
-    val rowHeight = (40f - 6f * header).dp
+    // Per-frame values are lambdas read during layout/draw; composition only sees threshold flips.
+    val header = { (progress.value / .65f).coerceIn(0f, 1f) }
+    val extra = { ((progress.value - .22f) / .73f).coerceIn(0f, 1f) }
+    val rowHeight = { (40f - 6f * header()).dp }
+    val opening by remember(progress) { derivedStateOf { progress.value > 0f } }
+    val compactShown by remember(progress) { derivedStateOf { progress.value < .65f } }
+    val legendReadable by remember(progress) { derivedStateOf { progress.value / .65f >= .99f } }
+    val extraShown by remember(progress) { derivedStateOf { progress.value > .22f } }
+    val extraReadable by remember(progress) { derivedStateOf { (progress.value - .22f) / .73f >= .99f } }
+    val full by remember(progress) { derivedStateOf { progress.value >= .99f } }
     val offline = footballOffline(state.now)
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val statWidth = (maxWidth * .07f).coerceIn(20.dp, 30.dp)
         val pointsWidth = (maxWidth * .10f).coerceIn(28.dp, 38.dp)
         Column(Modifier.fillMaxWidth().then(if (fillRows) Modifier.fillMaxHeight() else Modifier)) {
-            if (header < 1f) {
-                Box(Modifier.fillMaxWidth().height((42f * (1f - header)).dp).clipToBounds()
-                    .graphicsLayer { alpha = 1f - header }
-                    .then(if (header > 0f) Modifier.clearAndSetSemantics {} else Modifier)) {
+            if (compactShown) {
+                Box(Modifier.fillMaxWidth().liveHeight { (42f * (1f - header())).dp }.clipToBounds()
+                    .graphicsLayer { alpha = 1f - header() }
+                    .then(if (opening) Modifier.clearAndSetSemantics {} else Modifier)) {
                     Column(Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true)) {
                         LeagueCompactHeader()
                         Spacer(Modifier.height(12.dp))
                     }
                 }
             }
-            if (header > 0f) {
-                Box(Modifier.fillMaxWidth().height((30f * header).dp).clipToBounds()
-                    .graphicsLayer { alpha = header }
-                    .then(if (header < .99f) Modifier.clearAndSetSemantics {} else Modifier)) {
+            if (opening) {
+                Box(Modifier.fillMaxWidth().liveHeight { (30f * header()).dp }.clipToBounds()
+                    .graphicsLayer { alpha = header() }
+                    .then(if (!legendReadable) Modifier.clearAndSetSemantics {} else Modifier)) {
                     LeagueLegend(Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true))
                 }
             }
             LeagueTableHeader(statWidth, pointsWidth)
             val rowsModifier = when {
                 fillRows -> Modifier.weight(1f).verticalScroll(scroll, enabled = interactive)
-                progress > 0f -> Modifier.heightIn(max = 600.dp).verticalScroll(scroll, enabled = interactive)
+                opening -> Modifier.heightIn(max = 600.dp).verticalScroll(scroll, enabled = interactive)
                 else -> Modifier
-            }.fillMaxWidth().then(if (progress >= .99f) Modifier.testTag("league-full-table") else Modifier)
+            }.fillMaxWidth().then(if (full) Modifier.testTag("league-full-table") else Modifier)
             Column(rowsModifier) {
                 FootballDataStatus(
                     clubs.isNotEmpty(), state.leagueLoading, state.leagueError, offline,
@@ -287,10 +299,10 @@ private fun LeagueCardContents(
                 clubs.take(5).forEach { club ->
                     LeagueTableRow(club, state.config.footballClub, statWidth, pointsWidth, rowHeight, header)
                 }
-                if (extra > 0f && clubs.size > 5) {
-                    Box(Modifier.fillMaxWidth().height(rowHeight * (clubs.size - 5) * extra)
-                        .clipToBounds().graphicsLayer { alpha = extra }
-                        .then(if (extra < .99f) Modifier.clearAndSetSemantics {} else Modifier)) {
+                if (extraShown && clubs.size > 5) {
+                    Box(Modifier.fillMaxWidth().liveHeight { rowHeight() * (clubs.size - 5) * extra() }
+                        .clipToBounds().graphicsLayer { alpha = extra() }
+                        .then(if (!extraReadable) Modifier.clearAndSetSemantics {} else Modifier)) {
                         Column(Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true)) {
                             clubs.drop(5).forEach { club ->
                                 LeagueTableRow(club, state.config.footballClub, statWidth, pointsWidth, rowHeight, header)
@@ -299,10 +311,10 @@ private fun LeagueCardContents(
                     }
                 }
             }
-            if (header < 1f) {
-                Box(Modifier.fillMaxWidth().height((48f * (1f - header)).dp).clipToBounds()
-                    .graphicsLayer { alpha = 1f - header }
-                    .then(if (header > 0f) Modifier.clearAndSetSemantics {} else Modifier)) {
+            if (compactShown) {
+                Box(Modifier.fillMaxWidth().liveHeight { (48f * (1f - header())).dp }.clipToBounds()
+                    .graphicsLayer { alpha = 1f - header() }
+                    .then(if (opening) Modifier.clearAndSetSemantics {} else Modifier)) {
                     LeagueOpenAction(clubs.isNotEmpty(), open, interactive)
                 }
             }
@@ -354,28 +366,33 @@ private fun LeagueTableRow(
     selectedId: String,
     statWidth: Dp,
     pointsWidth: Dp,
-    rowHeight: Dp,
-    expanded: Float
+    rowHeight: () -> Dp,
+    expanded: () -> Float
 ) {
     val selected = club.id == selectedId
     val mark = when (club.position) { in 1..4 -> F.purple; in 18..20 -> RelegationRed; else -> Color.Transparent }
-    Box(Modifier.fillMaxWidth().height(rowHeight).testTag("league-row-${club.position}")
+    Box(Modifier.fillMaxWidth().liveHeight(rowHeight).testTag("league-row-${club.position}")
         .clip(RoundedCornerShape(14.dp))
         .background(if (selected) F.lilac.copy(alpha = if (LocalGlass.current.dark) .25f else .28f) else Color.Transparent)
+        .drawBehind {
+            val e = expanded()
+            if (mark != Color.Transparent && e > 0f) drawRoundRect(mark.copy(alpha = e), Offset(0f, size.height * .19f),
+                Size(3.dp.toPx(), size.height * .62f), CornerRadius(2.dp.toPx()))
+        }
         .semantics(mergeDescendants = true) {
             contentDescription = "${club.position}. ${club.name}, played ${club.played}, won ${club.won}, drawn ${club.drawn}, lost ${club.lost}, ${club.points} points${if (selected) ", my team" else ""}"
         }) {
-        if (mark != Color.Transparent && expanded > 0f) {
-            Box(Modifier.align(Alignment.CenterStart).width(3.dp).height(rowHeight * .62f)
-                .background(mark.copy(alpha = expanded), RoundedCornerShape(2.dp)))
-        }
         Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            Text(club.position.toString(), style = F.text(13, true), textAlign = TextAlign.Center,
-                color = if (club.position in 1..4) androidx.compose.ui.graphics.lerp(F.purple, F.muted, expanded) else F.muted,
-                modifier = Modifier.width(24.dp))
+            Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                // Cross-fade instead of animating text colour so the row is never recomposed mid-animation.
+                Text(club.position.toString(), style = F.text(13, true), textAlign = TextAlign.Center, color = F.muted,
+                    modifier = Modifier.graphicsLayer { alpha = if (club.position in 1..4) expanded() else 1f })
+                if (club.position in 1..4) Text(club.position.toString(), style = F.text(13, true), textAlign = TextAlign.Center,
+                    color = F.purple, modifier = Modifier.graphicsLayer { alpha = 1f - expanded() }.clearAndSetSemantics {})
+            }
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TeamLogo(club.id, club.name, club.logo, Modifier.size((26f - 4f * expanded).dp))
+                TeamLogo(club.id, club.name, club.logo, Modifier.liveSize { (26f - 4f * expanded()).dp })
                 Text(club.shortName, style = F.text(13, selected), maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f))
             }

@@ -110,7 +110,8 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     }
     val activeEdit = pageEdits.values.firstOrNull { it.active }
     val editing = activeEdit != null
-    val editBlur by animateDpAsState(if (editing) 16.dp else 0.dp, spring(1f, 300f), label = "Edit backdrop")
+    val editBlur = animateDpAsState(if (editing) 16.dp else 0.dp, spring(1f, 300f), label = "Edit backdrop")
+    val editDimmed by remember { derivedStateOf { editBlur.value > 0.dp } }
     LaunchedEffect(pager.settledPage) {
         val current = pageEdits.values.firstOrNull { it.active } ?: return@LaunchedEffect
         val settled = model.state.value.config.pages.getOrNull(pager.settledPage) ?: return@LaunchedEffect
@@ -211,15 +212,20 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
     BackHandler {
         when { pageEdit!=null -> finishPageEdit(); resizeEditor!=null -> resizeEditor=null; widgetEdit!=null -> widgetEdit=null; appMenu!=null -> appMenu=null; hero.kind!=null -> hero.expanded=false; panel!=null -> panelBack(); drawer -> { drawer=false; search=""; focus.clearFocus(); keyboard?.hide() }; else -> scope.launch { pager.animateScrollToPage(HOME_PAGE,animationSpec=spring(.92f,320f)) } }
     }
-    val drawerProgress by animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
-    val panelBlur by animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
+    val drawerProgress=animateFloatAsState(drawerGesture ?: if(drawer) 1f else 0f,if(drawerGesture!=null) snap() else spring(.9f,360f),label="Drawer spring")
+    // Composition only observes these thresholds; per-frame values are read in graphics layers.
+    val drawerShown by remember { derivedStateOf { drawerProgress.value>.001f } }
+    val drawerCovers by remember { derivedStateOf { drawerProgress.value>.01f } }
+    val drawerSettled by remember { derivedStateOf { drawerProgress.value>.98f } }
+    val pageDotsShown by remember { derivedStateOf { drawerProgress.value<.99f } }
+    val panelBlur=animateDpAsState(if(widgetEdit!=null || resizeEditor!=null || panel!=null || appMenu!=null || hero.kind!=null) 20.dp else 0.dp,spring(1f,280f),label="Panel backdrop")
     CompositionLocalProvider(LocalSpaceApps provides SpaceAppsHost(badges,::launch,{ id -> showPanel(if(id==null)"Spaces" else "Spaces:$id") }),LocalSpaceWidgetGallery provides {showPanel("Space widgets")},LocalClockPanel provides { tab -> showPanel("Clock:$tab") },LocalWeatherLocate provides locateWeather,LocalContactsAccess provides contactsAccess,LocalDockDragging provides { dockDragging=it },LocalWidgetEdit provides { kind -> val page=state.config.pages.getOrNull(pager.currentPage) ?: "Home"; widgetEditPage=page; editFor(page).activate(kind,Offset.Zero) }) {
     Box(Modifier.fillMaxSize().testTag("fluid-launcher").onSizeChanged { sceneSize=it }.routePageDrags(pageEdits)) {
-        FluidWallpaper(Modifier.blur(editBlur))
-        if(editBlur>0.dp) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=editBlur.value/16f*.10f)))
-        Box(Modifier.fillMaxSize().blur(panelBlur)) {
-            HorizontalPager(pager,beyondViewportPageCount=if(editing) 1 else 0,modifier=Modifier.fillMaxSize().graphicsLayer { scaleX=1f-drawerProgress*.055f; scaleY=scaleX; alpha=1f-drawerProgress*.48f }.blur((drawerProgress*18).dp)
-                .then(if(drawerProgress>.01f) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null && pageEdits.values.none{it.dragging!=null}) { index ->
+        FluidWallpaper(Modifier.liveBlur { editBlur.value })
+        if(editDimmed) Box(Modifier.fillMaxSize().graphicsLayer { alpha=editBlur.value.value/16f }.background(Color.Black.copy(alpha=.10f)))
+        Box(Modifier.fillMaxSize().liveBlur { panelBlur.value }) {
+            HorizontalPager(pager,beyondViewportPageCount=if(editing) 1 else 0,modifier=Modifier.fillMaxSize().graphicsLayer { scaleX=1f-drawerProgress.value*.055f; scaleY=scaleX; alpha=1f-drawerProgress.value*.48f }.liveBlur { (drawerProgress.value*18).dp }
+                .then(if(drawerCovers) Modifier.clearAndSetSemantics {} else Modifier),userScrollEnabled=!dockDragging && !drawer && panel==null && hero.kind==null && pageEdits.values.none{it.dragging!=null}) { index ->
                 val distance = ((pager.currentPage-index)+pager.currentPageOffsetFraction).absoluteValue.coerceAtMost(1f)
                 val currentPage=state.config.pages[index]
                 val pagePress=remember { MutableInteractionSource() }
@@ -242,10 +248,10 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
                     }
                 }
             }
-            if(drawerProgress<.99f) PageNavigation(pager.currentPage,1f-drawerProgress,state.config.pages,Modifier.blur(editBlur*.6f,BlurredEdgeTreatment.Unbounded)) { scope.launch { pager.animateScrollToPage(it,animationSpec=spring(.9f,320f)) } }
-            if(drawerProgress>.001f) {
-                Box(Modifier.fillMaxSize().graphicsLayer { translationY=(1f-drawerProgress)*sceneSize.height; alpha=(drawerProgress*2).coerceAtMost(1f) }.statusBarsPadding().padding(top=8.dp).testTag("fluid-drawer-surface")) {
-                    FluidDrawer(state,badges,search,{search=it},tab,{tab=it},searchFocused,drawerProgress>.98f,appMenu==null && panel==null,::launch,
+            if(pageDotsShown) PageNavigation(pager.currentPage,{1f-drawerProgress.value},state.config.pages,Modifier.liveBlur(unbounded=true) { editBlur.value*.6f }) { scope.launch { pager.animateScrollToPage(it,animationSpec=spring(.9f,320f)) } }
+            if(drawerShown) {
+                Box(Modifier.fillMaxSize().graphicsLayer { translationY=(1f-drawerProgress.value)*sceneSize.height; alpha=(drawerProgress.value*2).coerceAtMost(1f) }.statusBarsPadding().padding(top=8.dp).testTag("fluid-drawer-surface")) {
+                    FluidDrawer(state,badges,search,{search=it},tab,{tab=it},searchFocused,drawerSettled,appMenu==null && panel==null,::launch,
                         options={ app -> focus.clearFocus(force=true); keyboard?.hide(); searchFocused=false; appMenu=app },close={drawer=false;focus.clearFocus();keyboard?.hide()},settings={showPanel("Settings")},pull={value -> drawerGesture=(1f-value/sceneSize.height.coerceAtLeast(1)).coerceIn(0f,1f)},finishPull={value -> drawer=value<sceneSize.height*.18f;drawerGesture=null})
                 }
             }
@@ -276,8 +282,8 @@ internal val pageNames = listOf("Markets", "Home", "Space", "Plan")
 }
 }
 
-@Composable private fun BoxScope.PageNavigation(page: Int, opacity: Float, names:List<String>, modifier: Modifier = Modifier, select: (Int)->Unit) {
-    Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom=3.dp).then(modifier).graphicsLayer { alpha=opacity }, horizontalArrangement=Arrangement.spacedBy(2.dp)) {
+@Composable private fun BoxScope.PageNavigation(page: Int, opacity: () -> Float, names:List<String>, modifier: Modifier = Modifier, select: (Int)->Unit) {
+    Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom=3.dp).then(modifier).graphicsLayer { alpha=opacity() }, horizontalArrangement=Arrangement.spacedBy(2.dp)) {
         names.forEachIndexed { index,name ->
             val width by animateDpAsState(if(page==index) 15.dp else 5.dp,spring(.82f,400f),label="Page dot")
             Box(Modifier.width(28.dp).height(26.dp).clickable(role=Role.Tab){select(index)}.semantics { contentDescription=name; selected=page==index },contentAlignment=Alignment.Center) {
@@ -325,7 +331,9 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
         kind==FluidWidget.CLOCK -> openClock("Alarm")
         opensDetail -> hero.open(kind,source)
     } }
-    val size=if(fixed!=null) Modifier.height(fixed).clip(RoundedCornerShape(30.dp)) else Modifier.animateContentSize(spring(1f,350f)).heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp)
+    // The notification stack animates its own height; a second size animation would chase it every frame.
+    val resize=if(kind==FluidWidget.NOTIFICATIONS) Modifier else Modifier.animateContentSize(spring(1f,350f))
+    val size=if(fixed!=null) Modifier.height(fixed).clip(RoundedCornerShape(30.dp)) else resize.heightIn(min=widgetMinimum(kind,state.config)).padding(if(state.config.sizes[kind]=="Compact")12.dp else 20.dp)
     Column(modifier.fillMaxWidth().onGloballyPositioned { source=Rect(it.positionInRoot(),it.size.toSize());hero.bounds[kind]=source }.graphicsLayer { alpha=if(hero.kind==kind) 0f else 1f }
         .softPress(interaction).then(surface).combinedClickable(interactionSource=interaction,indication=null,onClick=click,onLongClick={if(pageEditor==null)edit(kind)}).then(size).testTag("fluid-widget-${kind.name}")
         .then(if(hero.kind==kind) Modifier.clearAndSetSemantics {} else Modifier)) {
@@ -339,12 +347,11 @@ internal fun fluidDock(apps:List<InstalledApp>,keys:List<String>):List<Installed
     val widgets=state.config.spaceWidgets.filterNot{it in tinyControls}
     val scroll=rememberScrollState()
     val density=LocalDensity.current
-    val phase=rememberInfiniteTransition(label="Widget wobble").animateFloat(0f,6.2831855f,infiniteRepeatable(tween(900,easing=LinearEasing)),label="Wobble")
     SideEffect { edit?.bind(widgets,with(density){16.dp.toPx()},scroll) }
     Box(modifier.navigationBarsPadding().onGloballyPositioned{edit?.viewport=it.boundsInRoot()}.testTag("fluid-space")) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom=100.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             FluidHeading("Your space","Apps and widgets, your way.") { if(edit?.active!=true) GlassIcon("edit","Organize spaces",onClick=manage) }
-            WidgetGrid(widgets,state.config,edit,16.dp,phase) { kind -> ExpandableWidget(kind,state,model,hero,calendar,activity) }
+            WidgetGrid(widgets,state.config,edit,16.dp) { kind -> ExpandableWidget(kind,state,model,hero,calendar,activity) }
             ControlWidgetRows(state.config.spaceWidgets.filter{it in tinyControls},state,model)
             val openGallery=LocalSpaceWidgetGallery.current
             if(edit?.active!=true) GlassButton("Add widgets",Modifier.fillMaxWidth(),glyph="plus",onClick=openGallery)
@@ -359,13 +366,12 @@ internal val LocalSpaceApps = compositionLocalOf { SpaceAppsHost(emptySet(),{_,_
     val widgets=model.widgetsForPage(page)
     val scroll=rememberScrollState()
     val density=LocalDensity.current
-    val phase=rememberInfiniteTransition(label="Widget wobble").animateFloat(0f,6.2831855f,infiniteRepeatable(tween(900,easing=LinearEasing)),label="Wobble")
     SideEffect { edit?.bind(widgets,with(density){14.dp.toPx()},scroll) }
     Box(modifier.navigationBarsPadding().onGloballyPositioned{edit?.viewport=it.boundsInRoot()}) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom=100.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             FluidHeading(page,"A fresh page to make your own.")
             if(widgets.isEmpty()) Text("Long press empty space to add widgets.",style=F.text(13,muted=true))
-            WidgetGrid(widgets,state.config,edit,14.dp,phase) { kind -> ExpandableWidget(kind,state,model,hero,calendar,activity) }
+            WidgetGrid(widgets,state.config,edit,14.dp) { kind -> ExpandableWidget(kind,state,model,hero,calendar,activity) }
         }
     }
 }

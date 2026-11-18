@@ -34,18 +34,20 @@ import kotlin.math.roundToInt
         }
     }
     BackHandler { hero.expanded=false }
+    val settled by remember(kind) { derivedStateOf { progress.value>.99f } }
     BoxWithConstraints(Modifier.fillMaxSize().imePadding().testTag("fluid-hero-overlay")) {
-        val p=progress.value.coerceIn(0f,1f)
         val density=LocalDensity.current
         val safe=WindowInsets.safeDrawing.asPaddingValues()
         val target=with(density){Rect(18.dp.toPx(),(safe.calculateTopPadding()+18.dp).toPx(),(maxWidth-18.dp).toPx(),(maxHeight-safe.calculateBottomPadding()-18.dp).toPx())}
         val source=hero.origin
-        val bounds=lerp(source,target,p)
-        Box(Modifier.fillMaxSize().background(Color(0xFF493475).copy(alpha=.10f*p)).pointerInput(Unit){detectTapGestures{hero.expanded=false}})
-        Column(Modifier.offset{IntOffset(bounds.left.roundToInt(),bounds.top.roundToInt())}.size(with(density){bounds.width.toDp()},with(density){bounds.height.toDp()})
-            .glass((30f+6*p).dp,true).testTag("fluid-expanded-widget").verticalScroll(scroll,enabled=p>.99f)
-            .padding(horizontal=if(kind==FluidWidget.MUSIC || kind==FluidWidget.MUSIC_OPEN)(20*p).dp else 20.dp).padding(top=if(kind==FluidWidget.MUSIC || kind==FluidWidget.MUSIC_OPEN)(20*p).dp else 20.dp,bottom=24.dp)) {
-            Row(Modifier.fillMaxWidth().height((56*p).dp).graphicsLayer{alpha=p},verticalAlignment=Alignment.CenterVertically){
+        // Progress is read only in layout and draw lambdas, so the expanded body is not recomposed per frame.
+        val p={progress.value.coerceIn(0f,1f)}
+        val music=kind==FluidWidget.MUSIC || kind==FluidWidget.MUSIC_OPEN
+        Box(Modifier.fillMaxSize().graphicsLayer{alpha=p()}.background(Color(0xFF493475).copy(alpha=.10f)).pointerInput(Unit){detectTapGestures{hero.expanded=false}})
+        Column(Modifier.liveBounds{lerp(source,target,p())}
+            .glass(30.dp,true).testTag("fluid-expanded-widget").verticalScroll(scroll,enabled=settled)
+            .livePadding(horizontal={if(music)(20*p()).dp else 20.dp},top={if(music)(20*p()).dp else 20.dp},bottom={0.dp}).padding(bottom=24.dp)) {
+            Row(Modifier.fillMaxWidth().liveHeight{(56*p()).dp}.graphicsLayer{alpha=p()},verticalAlignment=Alignment.CenterVertically){
                 androidx.compose.material3.Text(kind.title,style=F.text(22,true),modifier=Modifier.weight(1f));GlassIcon("close","Close widget"){hero.expanded=false}
             }
             WidgetBody(kind,state,model,detail=true,calendarAccess=calendar,activityAccess=activity)

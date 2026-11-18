@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.*
 import androidx.core.view.WindowCompat
 import com.example.launcher.ui.Glyph
 import com.example.launcher.R
+import kotlin.math.roundToInt
 
 data class GlassScene(val size: Size = Size(1080f, 2400f), val dark: Boolean = false, val frost: ImageBitmap? = null, val wallpaper:String="Dawn", val wallpaperImage:ImageBitmap?=null, val wallpaperBlur:Boolean=false, val accent:Color=Color(0xFF8051FF))
 val LocalGlass = staticCompositionLocalOf { GlassScene() }
@@ -149,6 +150,43 @@ fun Modifier.glass(radius: Dp = 28.dp, elevated: Boolean = false, strength: Floa
                 drawOutline(outline, highlight, style = Stroke(.65.dp.toPx()))
             }
         }
+}
+
+/** Layout-phase sizing: animated dimensions re-measure without recomposing their content. */
+internal fun Modifier.liveHeight(height: () -> Dp): Modifier = layout { measurable, constraints ->
+    val h = height().roundToPx().coerceIn(constraints.minHeight, constraints.maxHeight)
+    val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+    layout(placeable.width, h) { placeable.place(0, 0) }
+}
+
+internal fun Modifier.liveSize(size: () -> Dp): Modifier = layout { measurable, _ ->
+    val s = size().roundToPx().coerceAtLeast(0)
+    val placeable = measurable.measure(Constraints.fixed(s, s))
+    layout(s, s) { placeable.place(0, 0) }
+}
+
+internal fun Modifier.liveBounds(bounds: () -> Rect): Modifier = offset {
+    val b = bounds(); IntOffset(b.left.roundToInt(), b.top.roundToInt())
+}.layout { measurable, _ ->
+    val b = bounds()
+    val w = b.width.roundToInt().coerceAtLeast(0); val h = b.height.roundToInt().coerceAtLeast(0)
+    val placeable = measurable.measure(Constraints.fixed(w, h))
+    layout(w, h) { placeable.place(0, 0) }
+}
+
+internal fun Modifier.livePadding(horizontal: () -> Dp, top: () -> Dp = horizontal, bottom: () -> Dp = top): Modifier = layout { measurable, constraints ->
+    val x = horizontal().roundToPx(); val t = top().roundToPx(); val b = bottom().roundToPx()
+    val placeable = measurable.measure(constraints.offset(-x * 2, -(t + b)))
+    layout(constraints.constrainWidth(placeable.width + x * 2), constraints.constrainHeight(placeable.height + t + b)) { placeable.place(x, t) }
+}
+
+/** Blur whose radius is read in the layer phase, so animating it never recomposes the content. */
+internal fun Modifier.liveBlur(unbounded: Boolean = false, radius: () -> Dp): Modifier = graphicsLayer {
+    val r = radius().toPx()
+    if (r > .5f) {
+        renderEffect = BlurEffect(r, r, if (unbounded) TileMode.Decal else TileMode.Clamp)
+        clip = !unbounded
+    }
 }
 
 @Composable fun Modifier.softPress(interaction: MutableInteractionSource): Modifier {
